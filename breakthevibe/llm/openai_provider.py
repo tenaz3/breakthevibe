@@ -6,6 +6,7 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
+from breakthevibe.exceptions import LLMProviderError
 from breakthevibe.llm.provider import LLMProviderBase, LLMResponse
 
 
@@ -25,11 +26,14 @@ class OpenAIProvider(LLMProviderBase):
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        response = await self._client.chat.completions.create(
-            model=self._model,
-            messages=messages,
-            max_tokens=max_tokens,
-        )
+        try:
+            response = await self._client.chat.completions.create(
+                model=self._model,
+                messages=messages,
+                max_tokens=max_tokens,
+            )
+        except Exception as e:
+            raise LLMProviderError(f"OpenAI API error: {e}") from e
         choice = response.choices[0]
         usage = response.usage
         return LLMResponse(

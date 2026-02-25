@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from breakthevibe.mapper.api_merger import ApiMerger
-from breakthevibe.models.domain import ApiCallInfo, ApiMergeResult, CrawlResult, SiteMap
+from breakthevibe.models.domain import (
+    ApiCallInfo,
+    ApiMergeResult,
+    CrawlResult,
+    RouteRelationship,
+    SiteMap,
+)
 
 if TYPE_CHECKING:
     from breakthevibe.mapper.classifier import ComponentClassifier
@@ -52,6 +58,9 @@ class MindMapBuilder:
 
         all_api_calls = self._deduplicate_api_calls(crawl)
 
+        # Build route relationship graph from navigates_to data
+        route_relationships = self._build_route_relationships(crawl)
+
         # Merge with OpenAPI spec if available
         api_merge = None
         if openapi_spec:
@@ -73,7 +82,29 @@ class MindMapBuilder:
             pages=crawl.pages,
             api_endpoints=all_api_calls,
             api_merge=api_merge,
+            route_relationships=route_relationships,
         )
+
+    def _build_route_relationships(self, crawl: CrawlResult) -> list[RouteRelationship]:
+        """Build inter-route navigation graph from page navigates_to data."""
+        known_paths = {page.path for page in crawl.pages}
+        relationships: list[RouteRelationship] = []
+        seen: set[tuple[str, str]] = set()
+        for page in crawl.pages:
+            for target_path in page.navigates_to:
+                if target_path in known_paths and target_path != page.path:
+                    key = (page.path, target_path)
+                    if key not in seen:
+                        seen.add(key)
+                        relationships.append(
+                            RouteRelationship(
+                                source=page.path,
+                                target=target_path,
+                                relationship="navigates_to",
+                            )
+                        )
+        logger.debug("route_relationships_built", count=len(relationships))
+        return relationships
 
     def _deduplicate_api_calls(self, crawl: CrawlResult) -> list[ApiCallInfo]:
         """Collect and deduplicate API calls across all pages."""

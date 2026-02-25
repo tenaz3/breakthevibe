@@ -48,6 +48,9 @@ class TestComponentExtractor:
     async def test_extract_components_returns_list(self) -> None:
         mock_page = AsyncMock()
         mock_page.evaluate = AsyncMock(return_value=MOCK_DOM_RESULT)
+        mock_page.accessibility.snapshot = AsyncMock(
+            return_value={"role": "WebArea", "name": "", "children": []}
+        )
 
         extractor = ComponentExtractor()
         components = await extractor.extract_components(mock_page)
@@ -59,6 +62,9 @@ class TestComponentExtractor:
     async def test_extract_builds_selectors(self) -> None:
         mock_page = AsyncMock()
         mock_page.evaluate = AsyncMock(return_value=MOCK_DOM_RESULT)
+        mock_page.accessibility.snapshot = AsyncMock(
+            return_value={"role": "WebArea", "name": "", "children": []}
+        )
 
         extractor = ComponentExtractor()
         components = await extractor.extract_components(mock_page)
@@ -83,6 +89,7 @@ class TestComponentExtractor:
     async def test_extract_handles_empty_page(self) -> None:
         mock_page = AsyncMock()
         mock_page.evaluate = AsyncMock(return_value=[])
+        mock_page.accessibility.snapshot = AsyncMock(return_value=None)
 
         extractor = ComponentExtractor()
         components = await extractor.extract_components(mock_page)

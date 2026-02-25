@@ -72,6 +72,7 @@ class PipelineOrchestrator:
         project_id: str,
         url: str,
         rules_yaml: str = "",
+        openapi_spec: dict[str, Any] | None = None,
     ) -> PipelineResult:
         """Execute the full pipeline."""
         run_id = str(uuid.uuid4())
@@ -96,6 +97,7 @@ class PipelineOrchestrator:
             "rules_yaml": rules_yaml,
             "project_id": project_id,
             "run_id": run_id,
+            "openapi_spec": openapi_spec,
         }
 
         for stage, handler in stages:
@@ -177,7 +179,11 @@ class PipelineOrchestrator:
         context["crawl_result"] = result
 
     async def _run_map(self, context: dict[str, Any]) -> None:
-        result = await self._mapper.build(context.get("crawl_result"), context["url"])
+        result = await self._mapper.build(
+            context.get("crawl_result"),
+            context["url"],
+            openapi_spec=context.get("openapi_spec"),
+        )
         context["sitemap"] = result
 
         # Persist sitemap to DB (#11)
@@ -186,13 +192,12 @@ class PipelineOrchestrator:
 
             settings = get_settings()
             if settings.use_database:
-                from sqlalchemy.ext.asyncio import create_async_engine
                 from sqlmodel.ext.asyncio.session import AsyncSession
 
                 from breakthevibe.models.database import CrawlRun
+                from breakthevibe.storage.database import get_engine
 
-                engine = create_async_engine(settings.database_url, echo=settings.debug)
-                async with AsyncSession(engine) as session:
+                async with AsyncSession(get_engine()) as session:
                     crawl_run = CrawlRun(
                         project_id=int(context["project_id"]),
                         status="completed",

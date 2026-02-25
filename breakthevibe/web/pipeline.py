@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -40,20 +41,48 @@ def build_pipeline(
     # Rules engine (always available, uses defaults if no YAML)
     rules = RulesEngine.from_yaml(rules_yaml)
 
-    # LLM provider (if API key available)
-    llm = None
-    planner = None
-    classifier = None
-    if settings.anthropic_api_key:
-        llm = create_llm_provider("anthropic", api_key=settings.anthropic_api_key)
-        planner = AgentPlanner(llm=llm)
-        classifier = ComponentClassifier(llm=llm)
-    elif settings.openai_api_key:
-        llm = create_llm_provider("openai", api_key=settings.openai_api_key)
-        planner = AgentPlanner(llm=llm)
-        classifier = ComponentClassifier(llm=llm)
-    elif settings.ollama_base_url:
-        llm = create_llm_provider("ollama", base_url=settings.ollama_base_url)
+    # LLM provider — check per-module settings from DB first, fall back to env vars
+    from breakthevibe.web.dependencies import llm_settings_repo
+
+    llm_settings: dict = {}
+    try:
+        import asyncio
+
+        llm_settings = asyncio.get_event_loop().run_until_complete(llm_settings_repo.get_all())
+    except Exception:
+        pass
+
+    def _resolve_llm(module_name: str | None = None) -> Any:
+        """Resolve LLM provider for a module, checking DB settings then env."""
+        modules = llm_settings.get("modules", {})
+        mod_cfg = modules.get(module_name, {}) if module_name else {}
+        provider = mod_cfg.get("provider") or llm_settings.get("default_provider")
+        model = mod_cfg.get("model") or llm_settings.get("default_model")
+
+        # Try provider from settings, then fall back to env
+        api_key = llm_settings.get("anthropic_api_key") or settings.anthropic_api_key
+        openai_key = llm_settings.get("openai_api_key") or settings.openai_api_key
+        ollama_url = llm_settings.get("ollama_base_url") or settings.ollama_base_url
+
+        if provider == "openai" and openai_key:
+            return create_llm_provider("openai", api_key=openai_key, model=model)
+        if provider == "ollama" and ollama_url:
+            return create_llm_provider("ollama", base_url=ollama_url, model=model)
+        if api_key:
+            return create_llm_provider("anthropic", api_key=api_key, model=model)
+        if openai_key:
+            return create_llm_provider("openai", api_key=openai_key, model=model)
+        if ollama_url:
+            return create_llm_provider("ollama", base_url=ollama_url, model=model)
+        return None
+
+    # Create per-module LLM instances (with fallback to a shared default)
+    llm = _resolve_llm("generator")
+    mapper_llm = _resolve_llm("mapper") or llm
+    agent_llm = _resolve_llm("agent") or llm
+
+    planner = AgentPlanner(llm=agent_llm) if agent_llm else None
+    classifier = ComponentClassifier(llm=mapper_llm) if mapper_llm else None
 
     # Components
     run_dir = artifacts.get_run_dir(project_id, run_id)
@@ -71,7 +100,10 @@ def build_pipeline(
     # Runner — test output dir under the run's artifact directory
     test_output_dir = run_dir / "tests"
     test_output_dir.mkdir(parents=True, exist_ok=True)
-    runner = TestExecutor(output_dir=test_output_dir)
+    runner = TestExecutor(
+        output_dir=test_output_dir,
+        max_reruns=rules.get_max_retries(),
+    )
 
     scheduler = ParallelScheduler(rules=rules)
     collector = ResultCollector()

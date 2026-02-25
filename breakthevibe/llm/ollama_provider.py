@@ -6,6 +6,7 @@ from typing import Any
 
 import httpx
 
+from breakthevibe.exceptions import LLMProviderError
 from breakthevibe.llm.provider import LLMProviderBase, LLMResponse
 
 
@@ -29,10 +30,13 @@ class OllamaProvider(LLMProviderBase):
         if system:
             payload["system"] = system
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            resp = await client.post(f"{self._base_url}/api/generate", json=payload)
-            resp.raise_for_status()
-            data = resp.json()
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.post(f"{self._base_url}/api/generate", json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+        except Exception as e:
+            raise LLMProviderError(f"Ollama API error: {e}") from e
 
         return LLMResponse(
             content=data.get("response", ""),

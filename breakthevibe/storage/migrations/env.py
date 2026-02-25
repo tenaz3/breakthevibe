@@ -11,6 +11,7 @@ from sqlmodel import SQLModel
 # Import all models so SQLModel.metadata is populated
 from breakthevibe.models.database import (  # noqa: F401
     CrawlRun,
+    LlmSetting,
     Project,
     Route,
     TestCase,

@@ -54,13 +54,12 @@ async def _persist_test_run(project_id: str, result_data: dict[str, Any]) -> Non
         return
 
     try:
-        from sqlalchemy.ext.asyncio import create_async_engine
         from sqlmodel.ext.asyncio.session import AsyncSession
 
         from breakthevibe.models.database import TestRun
+        from breakthevibe.storage.database import get_engine
 
-        engine = create_async_engine(settings.database_url, echo=settings.debug)
-        async with AsyncSession(engine) as session:
+        async with AsyncSession(get_engine()) as session:
             test_run = TestRun(
                 project_id=int(project_id),
                 status="completed" if result_data.get("success") else "failed",

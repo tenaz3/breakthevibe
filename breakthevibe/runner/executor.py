@@ -45,9 +45,10 @@ class ExecutionResult:
 class TestExecutor:
     """Runs generated pytest code via subprocess."""
 
-    def __init__(self, output_dir: Path, timeout: int = 300) -> None:
+    def __init__(self, output_dir: Path, timeout: int = 300, max_reruns: int = 1) -> None:
         self._output_dir = output_dir
         self._timeout = timeout
+        self._max_reruns = max_reruns
         self._output_dir.mkdir(parents=True, exist_ok=True)
 
     async def run(
@@ -132,22 +133,26 @@ class TestExecutor:
         conftest = self._output_dir / "conftest.py"
         conftest.write_text(f"""\
 \"\"\"Auto-generated conftest for per-step capture.\"\"\"
-import asyncio
 import json
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
+from playwright.async_api import async_playwright
 
 CAPTURES_DIR = Path("{captures_dir_str}")
 
 
-@pytest.fixture()
-def page(browser):
-    \"\"\"Create a page with video recording in the captures directory.\"\"\"
-    context = browser.new_context(record_video_dir=str(CAPTURES_DIR))
-    pg = context.new_page()
-    yield pg
-    context.close()
+@pytest_asyncio.fixture()
+async def page():
+    \"\"\"Create an async page with video recording in the captures directory.\"\"\"
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        context = await browser.new_context(record_video_dir=str(CAPTURES_DIR))
+        pg = await context.new_page()
+        yield pg
+        await context.close()
+        await browser.close()
 
 
 @pytest.fixture(autouse=True)
@@ -179,12 +184,14 @@ def _capture_step_data(request):
 
     yield
 
-    # Take post-test screenshot
+    # Take post-test screenshot (sync wrapper for post-yield cleanup)
     screenshot_path = None
     if page:
+        import asyncio
         try:
             ss_path = CAPTURES_DIR / f"{{request.node.name}}.png"
-            page.screenshot(path=str(ss_path))
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(page.screenshot(path=str(ss_path)))
             screenshot_path = str(ss_path)
         except Exception:
             pass
@@ -231,7 +238,7 @@ def _capture_step_data(request):
             str(test_file),
             "-v",
             "--tb=short",
-            "--reruns=1",
+            f"--reruns={self._max_reruns}",
             "--reruns-delay=2",
         ]
         if workers > 1:

@@ -72,20 +72,38 @@ class ComponentExtractor:
             self._a11y_snapshot = None
 
         raw_elements: list[dict[str, Any]] = await page.evaluate(EXTRACT_JS)
+
+        # Build a11y lookup for enrichment: maps name -> a11y node properties
+        a11y_lookup = self._build_a11y_lookup(self._a11y_snapshot) if self._a11y_snapshot else {}
+
         components = []
         for el in raw_elements:
             if not el.get("visible", False):
                 continue
             selectors = self._build_selectors(el)
+
+            # Enrich from accessibility tree: pick up refined role/name/state
+            aria_role = el.get("aria_role")
+            aria_name = el.get("aria_name")
+            name_key = aria_name or el.get("text", "")[:50]
+            a11y_node = a11y_lookup.get(name_key)
+            if a11y_node:
+                aria_role = a11y_node.get("role", aria_role)
+                if not aria_name and a11y_node.get("name"):
+                    aria_name = a11y_node["name"]
+
             components.append(
                 ComponentInfo(
-                    name=el.get("aria_name") or el.get("text", "")[:50] or el["tag"],
+                    name=aria_name or el.get("text", "")[:50] or el["tag"],
                     element_type=el["tag"],
                     selectors=selectors,
                     text_content=el.get("text") or None,
-                    aria_role=el.get("aria_role"),
+                    aria_role=aria_role,
+                    aria_name=aria_name,
                     test_id=el.get("test_id"),
                     is_interactive=el.get("is_interactive", False),
+                    visible=el.get("visible", True),
+                    bounding_box=el.get("bounding_box"),
                 )
             )
         return components
@@ -150,6 +168,24 @@ class ComponentExtractor:
                 ResilientSelector(strategy=SelectorStrategy.CSS, value=el["css_selector"])
             )
         return selectors
+
+    def _build_a11y_lookup(self, snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        """Flatten the accessibility tree into a name -> node lookup for enrichment."""
+        lookup: dict[str, dict[str, Any]] = {}
+        self._walk_a11y_tree(snapshot, lookup)
+        return lookup
+
+    def _walk_a11y_tree(self, node: dict[str, Any], lookup: dict[str, dict[str, Any]]) -> None:
+        """Recursively walk a11y snapshot nodes."""
+        name = node.get("name", "")
+        if name:
+            lookup[name] = {
+                "role": node.get("role"),
+                "name": name,
+                "value": node.get("value"),
+            }
+        for child in node.get("children", []):
+            self._walk_a11y_tree(child, lookup)
 
     def _infer_action_type(self, tag: str) -> str:
         """Infer interaction type from element tag."""

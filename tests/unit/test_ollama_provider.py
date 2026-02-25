@@ -256,6 +256,8 @@ class TestOllamaProviderGenerate:
     async def test_generate_propagates_http_error(self) -> None:
         import httpx
 
+        from breakthevibe.exceptions import LLMProviderError
+
         mock_resp = MagicMock()
         mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
             "500 Internal Server Error",
@@ -264,7 +266,7 @@ class TestOllamaProviderGenerate:
         )
         with _patch_httpx_client(mock_resp):
             provider = OllamaProvider()
-            with pytest.raises(httpx.HTTPStatusError):
+            with pytest.raises(LLMProviderError, match="Ollama API error"):
                 await provider.generate("Prompt")
 
     @pytest.mark.asyncio

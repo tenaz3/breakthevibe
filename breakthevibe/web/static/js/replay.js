@@ -74,7 +74,7 @@
         }
 
         if (consoleDiv) {
-            const logs = step.console_logs || [];
+            const logs = step.console_logs || step.console || [];
             if (logs.length > 0) {
                 consoleDiv.textContent = logs.join("\n");
                 consoleDiv.style.display = "block";

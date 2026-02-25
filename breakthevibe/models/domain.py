@@ -19,8 +19,11 @@ class ComponentInfo(BaseModel):
     selectors: list[ResilientSelector] = []
     text_content: str | None = None
     aria_role: str | None = None
+    aria_name: str | None = None
     test_id: str | None = None
     is_interactive: bool = True
+    visible: bool = True
+    bounding_box: dict[str, float] | None = None
 
 
 class InteractionInfo(BaseModel):
@@ -62,11 +65,20 @@ class ApiMergeResult(BaseModel):
     spec_only: list[dict[str, Any]] = []
 
 
+class RouteRelationship(BaseModel):
+    """Relationship between two routes (e.g., link navigates from one to another)."""
+
+    source: str  # source route path
+    target: str  # target route path
+    relationship: str = "navigates_to"  # type of relationship
+
+
 class SiteMap(BaseModel):
     base_url: str
     pages: list[PageData] = []
     api_endpoints: list[ApiCallInfo] = []  # deduplicated across all pages
     api_merge: ApiMergeResult | None = None  # populated when OpenAPI spec is provided
+    route_relationships: list[RouteRelationship] = []  # inter-route navigation graph
 
 
 class CrawlResult(BaseModel):

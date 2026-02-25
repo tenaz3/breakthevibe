@@ -1,5 +1,5 @@
 # Stage 1: Build dependencies
-FROM mcr.microsoft.com/playwright/python:v1.50.0-noble AS builder
+FROM mcr.microsoft.com/playwright/python:v1.58.0-noble AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ COPY pyproject.toml uv.lock* ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 # Stage 2: Runtime
-FROM mcr.microsoft.com/playwright/python:v1.50.0-noble
+FROM mcr.microsoft.com/playwright/python:v1.58.0-noble
 
 WORKDIR /app
 

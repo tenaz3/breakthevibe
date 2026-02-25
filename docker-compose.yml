@@ -15,18 +15,31 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build: .
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://breakthevibe:breakthevibe@db:5432/breakthevibe
+      USE_DATABASE: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+
   app:
     build: .
     ports:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://breakthevibe:breakthevibe@db:5432/breakthevibe
+      USE_DATABASE: "true"
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - artifact_data:/data/artifacts
 

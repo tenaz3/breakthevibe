@@ -22,11 +22,21 @@ class LoginRequest(BaseModel):
 async def login(body: LoginRequest, response: Response) -> dict:
     """Create a session for the user.
 
-    In MVP, accepts any non-empty username/password.
-    Replace with real credential validation in production.
+    When ADMIN_USERNAME/ADMIN_PASSWORD are set, validates credentials.
+    Otherwise falls back to MVP mode (any non-empty credentials accepted).
     """
     if not body.username or not body.password:
         raise HTTPException(status_code=400, detail="Username and password required")
+
+    from breakthevibe.config.settings import get_settings
+
+    settings = get_settings()
+    if (
+        settings.admin_username
+        and settings.admin_password
+        and (body.username != settings.admin_username or body.password != settings.admin_password)
+    ):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
     auth = get_session_auth()
     token = auth.create_session(body.username)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, Request
@@ -44,9 +45,21 @@ async def test_runs_page(request: Request, project_id: str) -> HTMLResponse:
     project = await project_repo.get(project_id)
     if not project:
         return HTMLResponse(content="Project not found", status_code=404)
+    # Build a list of runs for the template (currently one run per project in memory)
     result = pipeline_results.get(project_id, {})
+    runs = []
+    if result.get("run_id"):
+        runs.append(
+            {
+                "run_id": result["run_id"],
+                "status": result.get("status", "passed" if result.get("success") else "failed"),
+                "total": result.get("total", 0),
+                "passed": result.get("passed", 0),
+                "failed": result.get("failed", 0),
+            }
+        )
     return templates.TemplateResponse(
-        "test_runs.html", {"request": request, "project": project, "result": result}
+        "test_runs.html", {"request": request, "project": project, "runs": runs}
     )
 
 
@@ -109,20 +122,32 @@ async def test_result_detail_page(request: Request, run_id: str) -> HTMLResponse
     duration = f"{result.get('duration_seconds', 0):.1f}s"
     heal_warnings = result.get("heal_warnings", [])
 
-    # Build step replay data for JS
-    import json
-
+    # Build step replay data for JS (field names match replay.js expectations)
     replay_steps = []
     for suite in suites:
         for step in suite.get("step_captures", []):
             replay_steps.append(
                 {
                     "name": step.get("name", ""),
-                    "screenshot": step.get("screenshot_path", ""),
+                    "screenshot_url": step.get("screenshot_path", ""),
                     "network_requests": step.get("network_calls", []),
-                    "console": step.get("console_logs", []),
+                    "console_logs": step.get("console_logs", []),
                 }
             )
+
+    # Collect visual diff images from suites
+    diffs = result.get("diffs", [])
+
+    # Find video URL from the first suite that has one
+    video_url = result.get("video_url")
+    if not video_url:
+        for suite in suites:
+            for step in suite.get("step_captures", []):
+                if step.get("video_path"):
+                    video_url = step["video_path"]
+                    break
+            if video_url:
+                break
 
     return templates.TemplateResponse(
         "test_result_detail.html",
@@ -137,8 +162,8 @@ async def test_result_detail_page(request: Request, run_id: str) -> HTMLResponse
             "duration": duration,
             "suites": suites,
             "heal_warnings": heal_warnings,
-            "diffs": [],
-            "video_url": None,
+            "diffs": diffs,
+            "video_url": video_url,
             "replay_steps_json": json.dumps(replay_steps),
         },
     )

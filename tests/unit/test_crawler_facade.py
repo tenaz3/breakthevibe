@@ -355,6 +355,10 @@ class TestCrawlerScrollForContent:
         """Create a Crawler instance with _rules=None for scroll testing."""
         crawler = Crawler.__new__(Crawler)
         crawler._rules = None
+        crawler._after_click_wait = 500
+        crawler._page_load_timeout = 30000
+        crawler._viewport_width = 1280
+        crawler._viewport_height = 800
         return crawler
 
     @pytest.mark.asyncio

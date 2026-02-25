@@ -13,6 +13,8 @@ from breakthevibe.constants import (
     DEFAULT_MAX_DEPTH,
     DEFAULT_PAGE_LOAD_TIMEOUT_MS,
     DEFAULT_SCROLL_WAIT_MS,
+    DEFAULT_VIEWPORT_HEIGHT,
+    DEFAULT_VIEWPORT_WIDTH,
     MAX_SCROLL_ATTEMPTS,
 )
 from breakthevibe.crawler.browser import BrowserManager
@@ -53,12 +55,24 @@ class Crawler:
         self._run_id = run_id
         self._rules = rules
 
+        # Viewport and wait time defaults (may be overridden by rules)
+        self._viewport_width = DEFAULT_VIEWPORT_WIDTH
+        self._viewport_height = DEFAULT_VIEWPORT_HEIGHT
+        self._page_load_timeout = DEFAULT_PAGE_LOAD_TIMEOUT_MS
+        self._after_click_wait = DEFAULT_AFTER_CLICK_WAIT_MS
+
         # Apply rules overrides
         if rules:
             self._max_depth = rules.get_max_depth()
             skip_urls = rules.config.crawl.skip_urls
             if skip_urls:
                 self._skip_patterns = list(set(self._skip_patterns + skip_urls))
+            viewport = rules.get_viewport()
+            self._viewport_width = viewport.get("width", self._viewport_width)
+            self._viewport_height = viewport.get("height", self._viewport_height)
+            wait_times = rules.get_wait_times()
+            self._page_load_timeout = wait_times.get("page_load", self._page_load_timeout)
+            self._after_click_wait = wait_times.get("after_click", self._after_click_wait)
 
     async def crawl(self, url: str) -> CrawlResult:
         """Crawl a website starting from the given URL.
@@ -100,7 +114,11 @@ class Crawler:
                 navigator.mark_visited(current_url)
 
                 # Create a new context per route for video segmentation (#7)
-                context = await self._browser.new_context(video_dir=video_dir)
+                context = await self._browser.new_context(
+                    video_dir=video_dir,
+                    viewport_width=self._viewport_width,
+                    viewport_height=self._viewport_height,
+                )
                 page = await self._browser.new_page(context)
 
                 # Install network interception
@@ -168,8 +186,8 @@ class Crawler:
 
         # Tag network calls with current action (#6)
         interceptor.set_current_action(f"navigate:{url}")
-        await page.goto(url, timeout=DEFAULT_PAGE_LOAD_TIMEOUT_MS)
-        await page.wait_for_load_state("networkidle", timeout=DEFAULT_PAGE_LOAD_TIMEOUT_MS)
+        await page.goto(url, timeout=self._page_load_timeout)
+        await page.wait_for_load_state("networkidle", timeout=self._page_load_timeout)
         await navigator.install_spa_listener(page)
 
         # Handle interaction rules (cookie banners, modals)
@@ -266,7 +284,7 @@ class Crawler:
                     locator = page.locator(selector).first
                     if await locator.is_visible(timeout=1000):
                         await locator.click()
-                        await page.wait_for_timeout(DEFAULT_AFTER_CLICK_WAIT_MS)
+                        await page.wait_for_timeout(self._after_click_wait)
                         logger.debug("cookie_banner_dismissed", selector=selector)
                         break
                 except Exception:
@@ -283,7 +301,7 @@ class Crawler:
                     locator = page.locator(selector).first
                     if await locator.is_visible(timeout=500):
                         await locator.click()
-                        await page.wait_for_timeout(DEFAULT_AFTER_CLICK_WAIT_MS)
+                        await page.wait_for_timeout(self._after_click_wait)
                         logger.debug("modal_closed", selector=selector)
                         break
                 except Exception:
@@ -333,7 +351,7 @@ class Crawler:
                                 pass
 
                         await link.click(timeout=2000)
-                        await page.wait_for_timeout(DEFAULT_AFTER_CLICK_WAIT_MS)
+                        await page.wait_for_timeout(self._after_click_wait)
 
                         # Screenshot after click (#8)
                         if self._artifacts and self._project_id and self._run_id and extractor:
@@ -350,8 +368,8 @@ class Crawler:
 
                         click_index += 1
                         # Navigate back for the next click
-                        await page.go_back(timeout=DEFAULT_PAGE_LOAD_TIMEOUT_MS)
-                        await page.wait_for_timeout(DEFAULT_AFTER_CLICK_WAIT_MS)
+                        await page.go_back(timeout=self._page_load_timeout)
+                        await page.wait_for_timeout(self._after_click_wait)
                     except Exception:
                         continue
             except Exception:
@@ -379,4 +397,4 @@ class Crawler:
 
         # Scroll back to top
         await page.evaluate("window.scrollTo(0, 0)")
-        await page.wait_for_timeout(DEFAULT_AFTER_CLICK_WAIT_MS)
+        await page.wait_for_timeout(self._after_click_wait)

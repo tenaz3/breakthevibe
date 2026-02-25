@@ -4,6 +4,7 @@ from typing import Any
 
 from anthropic import AsyncAnthropic
 
+from breakthevibe.exceptions import LLMProviderError
 from breakthevibe.llm.provider import LLMProviderBase, LLMResponse
 
 
@@ -23,7 +24,10 @@ class AnthropicProvider(LLMProviderBase):
         if system:
             kwargs["system"] = system
 
-        message = await self._client.messages.create(**kwargs)
+        try:
+            message = await self._client.messages.create(**kwargs)
+        except Exception as e:
+            raise LLMProviderError(f"Anthropic API error: {e}") from e
         return LLMResponse(
             content=message.content[0].text,
             model=message.model,

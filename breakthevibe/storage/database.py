@@ -1,18 +1,25 @@
 """Async database engine and session factory."""
 
 from collections.abc import AsyncGenerator
+from functools import lru_cache
 
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from breakthevibe.config.settings import get_settings
 
 
-def get_engine():  # noqa: ANN201
-    """Create async database engine from settings."""
+@lru_cache
+def get_engine() -> AsyncEngine:
+    """Return a cached async database engine (singleton per process)."""
     settings = get_settings()
-    return create_async_engine(settings.database_url, echo=settings.debug)
+    return create_async_engine(
+        settings.database_url,
+        echo=settings.debug,
+        pool_size=5,
+        max_overflow=10,
+    )
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
