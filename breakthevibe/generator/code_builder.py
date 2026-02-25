@@ -46,7 +46,7 @@ class CodeBuilder:
         ]
 
         if has_functional or has_visual:
-            lines.append("from playwright.async_api import Page")
+            lines.append("from playwright.async_api import Page, expect")
         if has_api:
             lines.append("import httpx")
         if has_visual:
@@ -67,7 +67,7 @@ class CodeBuilder:
             '"""Auto-generated functional test by BreakTheVibe."""',
             "",
             "import pytest",
-            "from playwright.async_api import Page",
+            "from playwright.async_api import Page, expect",
             "",
             "",
             self._generate_function_body(case),
@@ -147,17 +147,15 @@ class CodeBuilder:
         return "\n".join(lines)
 
     def _step_to_playwright(self, step: TestStep) -> list[str]:
-        """Convert a test step to Playwright code lines."""
+        """Convert a test step to Playwright code lines with selector fallback."""
         lines: list[str] = []
         if step.action == "navigate":
             lines.append(f'    await page.goto("{step.target_url}")')
         elif step.action == "click":
-            locator = self._build_locator(step.selectors)
-            lines.append(f"    await {locator}.click()")
+            lines.extend(self._build_fallback_locator(step.selectors, "click()"))
         elif step.action == "fill":
-            locator = self._build_locator(step.selectors)
             value = step.expected or ""
-            lines.append(f'    await {locator}.fill("{value}")')
+            lines.extend(self._build_fallback_locator(step.selectors, f'fill("{value}")'))
         elif step.action == "assert_url":
             lines.append(f'    assert page.url == "{step.expected}"')
         elif step.action == "assert_text":
@@ -187,12 +185,38 @@ class CodeBuilder:
             lines.append(f'    await page.screenshot(path=str(tmp_path / "{name}.png"))')
         return lines
 
+    def _build_fallback_locator(self, selectors: list[ResilientSelector], action: str) -> list[str]:
+        """Build selector fallback chain: try each in priority order."""
+        if not selectors or len(selectors) <= 1:
+            locator = self._build_locator(selectors)
+            return [f"    await {locator}.{action}"]
+
+        # Generate try/except chain for resilient selector fallback
+        lines: list[str] = []
+        for i, sel in enumerate(selectors):
+            locator_str = self._single_locator(sel)
+            if i == 0:
+                lines.append("    try:")
+                lines.append(f"        locator = {locator_str}")
+                lines.append("        if await locator.count() > 0:")
+                lines.append(f"            await locator.{action}")
+            elif i == len(selectors) - 1:
+                lines.append("    except Exception:")
+                lines.append(f"        await {locator_str}.{action}")
+            else:
+                lines.append("    except Exception:")
+                lines.append("        try:")
+                lines.append(f"            await {locator_str}.{action}")
+        return lines
+
     def _build_locator(self, selectors: list[ResilientSelector]) -> str:
         """Build a Playwright locator from selectors, using highest priority."""
         if not selectors:
             return 'page.locator("body")'
+        return self._single_locator(selectors[0])
 
-        sel = selectors[0]  # Use highest priority
+    def _single_locator(self, sel: ResilientSelector) -> str:
+        """Convert a single selector to a Playwright locator string."""
         if sel.strategy == SelectorStrategy.TEST_ID:
             return f'page.get_by_test_id("{sel.value}")'
         elif sel.strategy == SelectorStrategy.ROLE:
@@ -201,5 +225,7 @@ class CodeBuilder:
             return f'page.get_by_role("{sel.value}")'
         elif sel.strategy == SelectorStrategy.TEXT:
             return f'page.get_by_text("{sel.value}")'
+        elif sel.strategy == SelectorStrategy.CSS:
+            return f'page.locator("{sel.value}")'
         else:
             return f'page.locator("{sel.value}")'

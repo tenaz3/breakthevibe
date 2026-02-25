@@ -45,7 +45,8 @@ def make_page(path: str, components: int = 2, api_calls: int = 1) -> PageData:
 
 @pytest.mark.unit
 class TestMindMapBuilder:
-    def test_build_from_crawl_result(self) -> None:
+    @pytest.mark.asyncio
+    async def test_build_from_crawl_result(self) -> None:
         crawl = CrawlResult(
             pages=[make_page("/"), make_page("/about")],
             total_routes=2,
@@ -53,13 +54,14 @@ class TestMindMapBuilder:
             total_api_calls=2,
         )
         builder = MindMapBuilder()
-        site_map = builder.build(crawl, base_url="https://example.com")
+        site_map = await builder.build(crawl, base_url="https://example.com")
 
         assert isinstance(site_map, SiteMap)
         assert site_map.base_url == "https://example.com"
         assert len(site_map.pages) == 2
 
-    def test_deduplicates_api_endpoints(self) -> None:
+    @pytest.mark.asyncio
+    async def test_deduplicates_api_endpoints(self) -> None:
         page1 = make_page("/", api_calls=0)
         page1.api_calls = [
             ApiCallInfo(url="https://example.com/api/users", method="GET", status_code=200),
@@ -72,24 +74,26 @@ class TestMindMapBuilder:
 
         crawl = CrawlResult(pages=[page1, page2], total_routes=2)
         builder = MindMapBuilder()
-        site_map = builder.build(crawl, base_url="https://example.com")
+        site_map = await builder.build(crawl, base_url="https://example.com")
 
         urls = [ep.url for ep in site_map.api_endpoints]
         assert len(urls) == 2
         assert "https://example.com/api/users" in urls
         assert "https://example.com/api/products" in urls
 
-    def test_empty_crawl_result(self) -> None:
+    @pytest.mark.asyncio
+    async def test_empty_crawl_result(self) -> None:
         crawl = CrawlResult(pages=[])
         builder = MindMapBuilder()
-        site_map = builder.build(crawl, base_url="https://example.com")
+        site_map = await builder.build(crawl, base_url="https://example.com")
 
         assert site_map.pages == []
         assert site_map.api_endpoints == []
 
-    def test_to_json(self) -> None:
+    @pytest.mark.asyncio
+    async def test_to_json(self) -> None:
         crawl = CrawlResult(pages=[make_page("/")])
         builder = MindMapBuilder()
-        site_map = builder.build(crawl, base_url="https://example.com")
+        site_map = await builder.build(crawl, base_url="https://example.com")
         json_str = site_map.model_dump_json()
         assert "https://example.com" in json_str

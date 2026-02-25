@@ -1,5 +1,5 @@
 # Stage 1: Build dependencies
-FROM mcr.microsoft.com/playwright/python:v1.48.0-noble AS builder
+FROM mcr.microsoft.com/playwright/python:v1.50.0-noble AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ COPY pyproject.toml uv.lock* ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 # Stage 2: Runtime
-FROM mcr.microsoft.com/playwright/python:v1.48.0-noble
+FROM mcr.microsoft.com/playwright/python:v1.50.0-noble
 
 WORKDIR /app
 
@@ -27,6 +27,7 @@ COPY --from=builder /app/.venv /app/.venv
 COPY breakthevibe/ breakthevibe/
 COPY pyproject.toml ./
 COPY alembic.ini* ./
+COPY scripts/ scripts/
 
 # Install project itself
 RUN uv sync --frozen --no-dev
@@ -38,8 +39,7 @@ RUN uv run playwright install chromium
 RUN mkdir -p /data/artifacts
 
 ENV PYTHONUNBUFFERED=1
-ENV BTV_ARTIFACT_DIR=/data/artifacts
-ENV BTV_DATABASE_URL=postgresql+asyncpg://breakthevibe:breakthevibe@db:5432/breakthevibe
+ENV ARTIFACTS_DIR=/data/artifacts
 
 EXPOSE 8000
 

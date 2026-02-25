@@ -51,6 +51,7 @@ class PageData(BaseModel):
     screenshot_path: str | None = None
     video_path: str | None = None
     navigates_to: list[str] = []  # paths this page links to
+    component_groups: list[dict[str, Any]] = []  # LLM classification groups
 
 
 class SiteMap(BaseModel):

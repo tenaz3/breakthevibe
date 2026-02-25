@@ -9,7 +9,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from breakthevibe.web.middleware import RequestIDMiddleware
+from breakthevibe.config.logging import setup_logging
+from breakthevibe.config.settings import get_settings
+from breakthevibe.web.middleware import RateLimitMiddleware, RequestIDMiddleware
 from breakthevibe.web.routes.crawl import router as crawl_router
 from breakthevibe.web.routes.pages import router as pages_router
 from breakthevibe.web.routes.projects import router as projects_router
@@ -22,6 +24,9 @@ logger = structlog.get_logger(__name__)
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    settings = get_settings()
+    setup_logging(log_level=settings.log_level, json_output=not settings.debug)
+
     app = FastAPI(
         title="BreakTheVibe",
         description="AI-powered QA automation platform",
@@ -31,11 +36,12 @@ def create_app() -> FastAPI:
     # Middleware (order matters — last added runs first)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["*"],
     )
+    app.add_middleware(RateLimitMiddleware, max_requests=60, window_seconds=60)
     app.add_middleware(RequestIDMiddleware)
 
     # Routers

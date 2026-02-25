@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql+asyncpg://breakthevibe:breakthevibe@localhost:5432/breakthevibe"
+    use_database: bool = False  # Set True in production to use PostgreSQL repos
 
     # App
     secret_key: str = "change-me-in-production"

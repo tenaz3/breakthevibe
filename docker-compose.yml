@@ -6,9 +6,9 @@ services:
       POSTGRES_PASSWORD: breakthevibe
       POSTGRES_DB: breakthevibe
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U breakthevibe"]
       interval: 5s
@@ -20,9 +20,10 @@ services:
     ports:
       - "8000:8000"
     environment:
-      BTV_DATABASE_URL: postgresql+asyncpg://breakthevibe:breakthevibe@db:5432/breakthevibe
+      DATABASE_URL: postgresql+asyncpg://breakthevibe:breakthevibe@db:5432/breakthevibe
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
     depends_on:
       db:
         condition: service_healthy
@@ -30,5 +31,5 @@ services:
       - artifact_data:/data/artifacts
 
 volumes:
-  pgdata:
+  postgres_data:
   artifact_data:

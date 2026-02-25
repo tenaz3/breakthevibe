@@ -41,7 +41,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      BTV_DATABASE_URL: postgresql+asyncpg://breakthevibe:breakthevibe@localhost:5432/breakthevibe_test
+      DATABASE_URL: postgresql+asyncpg://breakthevibe:breakthevibe@localhost:5432/breakthevibe_test
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
@@ -50,9 +50,21 @@ jobs:
       - run: uv run pytest -v --cov=breakthevibe --cov-report=xml -m "not integration"
       - run: uv run pytest -v -m integration
 
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --dev
+      - run: uv run pip-audit
+      - run: uv run bandit -r breakthevibe/ -c pyproject.toml || true
+
   docker:
     runs-on: ubuntu-latest
     needs: [lint, typecheck, test]
     steps:
       - uses: actions/checkout@v4
       - run: docker compose build
+      - run: docker compose up -d
+      - run: sleep 15 && curl -f http://localhost:8000/api/health
+      - run: docker compose down

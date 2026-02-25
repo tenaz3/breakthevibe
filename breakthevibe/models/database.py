@@ -94,3 +94,12 @@ class TestResult(SQLModel, table=True):
     console_log_json: str | None = None
     healed_selectors_json: str | None = None
     created_at: datetime = Field(default_factory=_utc_now)
+
+
+class LlmSetting(SQLModel, table=True):
+    __tablename__ = "llm_settings"
+
+    id: int | None = Field(default=None, primary_key=True)
+    key: str = Field(index=True, unique=True)
+    value_json: str
+    updated_at: datetime = Field(default_factory=_utc_now)

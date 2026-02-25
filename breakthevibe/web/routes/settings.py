@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request
@@ -12,32 +11,13 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from breakthevibe.generator.rules.schema import RulesConfig
-from breakthevibe.web.dependencies import project_repo
-
-if TYPE_CHECKING:
-    from typing import Any
+from breakthevibe.web.dependencies import llm_settings_repo, project_repo
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["settings"])
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
-
-# In-memory LLM settings (replaced by DB in production)
-_llm_settings: dict[str, Any] = {
-    "default_provider": "anthropic",
-    "default_model": "claude-sonnet-4-20250514",
-    "modules": {
-        "mapper": {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
-        "generator": {"provider": "anthropic", "model": "claude-opus-4-0-20250115"},
-        "agent": {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
-    },
-    "providers": {
-        "anthropic": {"api_key": ""},
-        "openai": {"api_key": ""},
-        "ollama": {"base_url": "http://localhost:11434"},
-    },
-}
 
 
 class ValidateRulesRequest(BaseModel):
@@ -85,24 +65,33 @@ async def validate_rules(body: ValidateRulesRequest) -> dict:
 
 @router.get("/settings/llm", response_class=HTMLResponse)
 async def llm_settings_page(request: Request) -> HTMLResponse:
+    settings = await llm_settings_repo.get_all()
     return templates.TemplateResponse(
-        "llm_settings.html", {"request": request, "settings": _llm_settings}
+        "llm_settings.html", {"request": request, "settings": settings}
     )
 
 
 @router.put("/api/settings/llm")
 async def update_llm_settings(request: Request) -> dict:
     form = await request.form()
+    updates: dict[str, str] = {}
     if form.get("default_provider"):
-        _llm_settings["default_provider"] = str(form["default_provider"])
+        updates["default_provider"] = str(form["default_provider"])
     if form.get("default_model"):
-        _llm_settings["default_model"] = str(form["default_model"])
+        updates["default_model"] = str(form["default_model"])
+
+    # Per-module settings are stored as nested dicts
+    current = await llm_settings_repo.get_all()
+    modules = current.get("modules", {})
     for module in ["mapper", "generator", "agent"]:
         provider = form.get(f"modules_{module}_provider")
         model = form.get(f"modules_{module}_model")
         if provider:
-            _llm_settings["modules"][module]["provider"] = str(provider)
+            modules.setdefault(module, {})["provider"] = str(provider)
         if model:
-            _llm_settings["modules"][module]["model"] = str(model)
-    logger.info("llm_settings_updated", settings=_llm_settings)
+            modules.setdefault(module, {})["model"] = str(model)
+    updates["modules"] = modules  # type: ignore[assignment]
+
+    await llm_settings_repo.set_many(updates)
+    logger.info("llm_settings_updated")
     return {"status": "saved"}

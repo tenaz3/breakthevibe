@@ -38,7 +38,7 @@ class TestAppFactory:
             resp = await client.options(
                 "/api/health",
                 headers={
-                    "Origin": "http://localhost:3000",
+                    "Origin": "http://localhost:8000",
                     "Access-Control-Request-Method": "GET",
                 },
             )

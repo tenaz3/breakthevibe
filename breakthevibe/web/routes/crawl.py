@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 
-from breakthevibe.web.dependencies import project_repo
+from breakthevibe.web.dependencies import project_repo, run_pipeline
 
 logger = structlog.get_logger(__name__)
 
@@ -13,10 +13,19 @@ router = APIRouter(tags=["crawl"])
 
 
 @router.post("/api/projects/{project_id}/crawl")
-async def trigger_crawl(project_id: str) -> dict:
+async def trigger_crawl(project_id: str, background_tasks: BackgroundTasks) -> dict:
     project = await project_repo.get(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    background_tasks.add_task(
+        run_pipeline,
+        project_id=project_id,
+        url=project["url"],
+        rules_yaml=project.get("rules_yaml", ""),
+    )
+
+    await project_repo.update(project_id, status="crawling")
     logger.info("crawl_triggered", project_id=project_id)
     return {"status": "accepted", "project_id": project_id, "message": "Crawl started"}
 
@@ -26,4 +35,10 @@ async def get_sitemap(project_id: str) -> dict:
     project = await project_repo.get(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    return {"project_id": project_id, "pages": [], "api_endpoints": []}
+    # Return cached sitemap if available
+    sitemap = project.get("sitemap", {})
+    return {
+        "project_id": project_id,
+        "pages": sitemap.get("pages", []),
+        "api_endpoints": sitemap.get("api_endpoints", []),
+    }

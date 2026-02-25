@@ -44,3 +44,9 @@ class CrawlStatus(StrEnum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class BrowserType(StrEnum):
+    CHROMIUM = "chromium"
+    FIREFOX = "firefox"
+    WEBKIT = "webkit"

@@ -17,6 +17,28 @@ EXTRACT_JS = """
         const rect = el.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return;
         const interactive = ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName);
+
+        // Build structural path (for STRUCTURAL selector)
+        const path = [];
+        let node = el;
+        while (node && node !== document.body) {
+            let seg = node.tagName.toLowerCase();
+            if (node.id) { seg += '#' + node.id; }
+            path.unshift(seg);
+            node = node.parentElement;
+        }
+
+        // Semantic tag detection (for SEMANTIC selector)
+        const semanticTags = ['nav', 'header', 'footer', 'main', 'aside', 'article',
+                              'section', 'form', 'table', 'figure', 'dialog'];
+        let semanticContext = null;
+        let parent = el.closest(semanticTags.join(','));
+        if (parent) {
+            semanticContext = parent.tagName.toLowerCase()
+                + (parent.getAttribute('aria-label')
+                    ? '[' + parent.getAttribute('aria-label') + ']' : '');
+        }
+
         elements.push({
             tag: el.tagName.toLowerCase(),
             text: (el.textContent || '').trim().slice(0, 200),
@@ -29,6 +51,8 @@ EXTRACT_JS = """
             aria_name: el.getAttribute('aria-label') || el.getAttribute('name') || null,
             bounding_box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
             visible: rect.width > 0 && rect.height > 0,
+            structural_path: path.join(' > '),
+            semantic_context: semanticContext,
         });
     });
     return elements;
@@ -54,6 +78,7 @@ class ComponentExtractor:
                     selectors=selectors,
                     text_content=el.get("text") or None,
                     aria_role=el.get("aria_role"),
+                    test_id=el.get("test_id"),
                     is_interactive=el.get("is_interactive", False),
                 )
             )
@@ -80,7 +105,10 @@ class ComponentExtractor:
 
     async def take_screenshot(self, page: Page, path: str) -> bytes:
         """Take a full-page screenshot."""
-        return await page.screenshot(path=path, full_page=True)
+        kwargs: dict[str, Any] = {"full_page": True}
+        if path:
+            kwargs["path"] = path
+        return await page.screenshot(**kwargs)
 
     def _build_selectors(self, el: dict[str, Any]) -> list[ResilientSelector]:
         """Build ordered list of selectors from most to least stable."""
@@ -100,6 +128,16 @@ class ComponentExtractor:
         if el.get("text") and len(el["text"]) < 100:
             selectors.append(
                 ResilientSelector(strategy=SelectorStrategy.TEXT, value=el["text"][:100])
+            )
+        # SEMANTIC: use semantic HTML context
+        if el.get("semantic_context"):
+            selectors.append(
+                ResilientSelector(strategy=SelectorStrategy.SEMANTIC, value=el["semantic_context"])
+            )
+        # STRUCTURAL: use DOM path
+        if el.get("structural_path"):
+            selectors.append(
+                ResilientSelector(strategy=SelectorStrategy.STRUCTURAL, value=el["structural_path"])
             )
         if el.get("css_selector"):
             selectors.append(

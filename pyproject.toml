@@ -57,6 +57,9 @@ markers = [
     "integration: integration tests (DB, browser, LLM)",
 ]
 
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

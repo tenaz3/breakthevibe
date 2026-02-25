@@ -6,9 +6,12 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
+
+if TYPE_CHECKING:
+    from breakthevibe.agent.planner import AgentPlanner
 
 logger = structlog.get_logger(__name__)
 
@@ -44,7 +47,7 @@ class PipelineOrchestrator:
         generator: Any = None,
         runner: Any = None,
         collector: Any = None,
-        planner: Any = None,
+        planner: AgentPlanner | None = None,
     ) -> None:
         self._crawler = crawler
         self._mapper = mapper
@@ -52,7 +55,7 @@ class PipelineOrchestrator:
         self._runner = runner
         self._collector = collector
         self._planner = planner
-        self.max_retries: int = 1
+        self.max_retries: int = 3 if planner else 1
 
     async def run(
         self,
@@ -79,6 +82,7 @@ class PipelineOrchestrator:
             "url": url,
             "rules_yaml": rules_yaml,
             "project_id": project_id,
+            "run_id": run_id,
         }
 
         for stage, handler in stages:
@@ -100,6 +104,29 @@ class PipelineOrchestrator:
                         attempt=attempt + 1,
                         error=last_error,
                     )
+
+                    # Consult planner for smart retry decisions
+                    if self._planner and attempt < self.max_retries - 1:
+                        decision = await self._planner.analyze_failure(
+                            stage=stage,
+                            error=last_error,
+                            attempt=attempt + 1,
+                        )
+                        if not decision.should_retry:
+                            logger.info(
+                                "planner_abort",
+                                stage=stage.value,
+                                reason=decision.reason,
+                            )
+                            break
+                        if decision.adjusted_params:
+                            context.update(decision.adjusted_params)
+                            logger.info(
+                                "planner_retry",
+                                stage=stage.value,
+                                reason=decision.reason,
+                                params=decision.adjusted_params,
+                            )
 
             if not success:
                 duration = time.monotonic() - start
@@ -129,7 +156,7 @@ class PipelineOrchestrator:
         context["crawl_result"] = result
 
     async def _run_map(self, context: dict[str, Any]) -> None:
-        result = await self._mapper.build(context.get("crawl_result"))
+        result = await self._mapper.build(context.get("crawl_result"), context["url"])
         context["sitemap"] = result
 
     async def _run_generate(self, context: dict[str, Any]) -> None:
@@ -144,5 +171,5 @@ class PipelineOrchestrator:
         if self._collector:
             self._collector.build_report(
                 project_id=context["project_id"],
-                run_id="auto",
+                run_id=context.get("run_id", "auto"),
             )
