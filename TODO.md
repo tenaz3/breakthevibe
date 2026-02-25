@@ -1,0 +1,1 @@
+How to turn this project into a SaaS project in the marketplace where I can have multiple tenancy? To provide this for different customers independently, how to isolate data for compliance with regulations and SLAs 
