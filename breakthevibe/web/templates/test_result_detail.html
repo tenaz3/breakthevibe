@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Test Result — BreakTheVibe{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Test Run: {{ run_id[:8] if run_id else 'N/A' }}</h1>
+    <span class="badge badge-{{ status }}">{{ status }}</span>
+</div>
+
+<div class="stats-bar">
+    <div class="stat"><div class="stat-value">{{ total }}</div><div class="stat-label">Total</div></div>
+    <div class="stat"><div class="stat-value" style="color:var(--success)">{{ passed }}</div><div class="stat-label">Passed</div></div>
+    <div class="stat"><div class="stat-value" style="color:var(--danger)">{{ failed }}</div><div class="stat-label">Failed</div></div>
+    <div class="stat"><div class="stat-value">{{ duration }}</div><div class="stat-label">Duration</div></div>
+</div>
+
+{% if heal_warnings %}
+<div class="card" style="border-color:var(--warning);margin:1rem 0">
+    <h3 style="color:var(--warning)">Healed Selectors</h3>
+    <ul>
+        {% for warning in heal_warnings %}
+        <li class="text-muted">{{ warning }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% for suite in suites %}
+<details class="card" style="margin-bottom:0.5rem">
+    <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        <strong>{{ suite.name }}</strong>
+        <span class="badge badge-{{ 'passed' if suite.success else 'failed' }}">
+            {{ 'PASS' if suite.success else 'FAIL' }}
+        </span>
+    </summary>
+    <pre style="margin-top:0.75rem;font-size:0.8rem;overflow-x:auto;color:var(--text-muted)">{{ suite.stdout }}</pre>
+</details>
+{% endfor %}
+
+<div class="replay-panel" id="replay-panel">
+    <h3>Step Replay</h3>
+    <div class="replay-controls">
+        <button class="btn btn-sm" id="replay-prev">Previous</button>
+        <span id="replay-counter" class="text-muted">0 / 0</span>
+        <button class="btn btn-sm" id="replay-next">Next</button>
+    </div>
+    <div id="replay-step-info"></div>
+    <img id="replay-screenshot" class="replay-screenshot" src="" alt="Step screenshot" style="display:none">
+    <div id="replay-network" style="margin-top:0.5rem"></div>
+    <pre id="replay-console" style="margin-top:0.5rem;font-size:0.8rem;color:var(--text-muted);display:none"></pre>
+</div>
+
+{% if diffs %}
+<h3 style="margin:1.5rem 0 0.5rem">Visual Diffs</h3>
+{% for diff in diffs %}
+<div class="diff-row">
+    <div><p class="text-muted">Baseline</p><img src="{{ diff.baseline }}" alt="Baseline"></div>
+    <div><p class="text-muted">Current</p><img src="{{ diff.current }}" alt="Current"></div>
+    <div><p class="text-muted">Diff</p><img src="{{ diff.diff }}" alt="Diff"></div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if video_url %}
+<h3 style="margin:1.5rem 0 0.5rem">Recording</h3>
+<video controls style="width:100%;border-radius:var(--radius)">
+    <source src="{{ video_url }}" type="video/webm">
+</video>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/replay.js"></script>
+<script>
+    if (typeof window.__replaySteps !== 'undefined') {
+        window.loadReplaySteps(window.__replaySteps);
+    }
+</script>
+{% endblock %}
