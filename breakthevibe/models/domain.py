@@ -17,6 +17,7 @@ class ComponentInfo(BaseModel):
     selectors: list[ResilientSelector] = []
     text_content: str | None = None
     aria_role: str | None = None
+    test_id: str | None = None
     is_interactive: bool = True
 
 
