@@ -1,0 +1,7 @@
+{
+    "products": [
+        {"id": 1, "name": "Widget", "price": 9.99, "category": "electronics"},
+        {"id": 2, "name": "Gadget", "price": 19.99, "category": "electronics"},
+        {"id": 3, "name": "Python Book", "price": 39.99, "category": "books"}
+    ]
+}

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><title>Test Shop</title></head>
+<body>
+    <nav>
+        <a href="/" data-testid="nav-home">Home</a>
+        <a href="/products.html" data-testid="nav-products">Products</a>
+    </nav>
+    <main>
+        <h1>Welcome to Test Shop</h1>
+        <button data-testid="cta-btn" onclick="location.href='/products.html'">
+            Browse Products
+        </button>
+        <div id="featured"></div>
+    </main>
+    <script>
+        fetch('/api/products.json')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('featured').textContent =
+                    data.products.length + ' products available';
+            });
+    </script>
+</body>
+</html>

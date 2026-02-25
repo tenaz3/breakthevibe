@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><title>Products — Test Shop</title></head>
+<body>
+    <nav>
+        <a href="/" data-testid="nav-home">Home</a>
+        <a href="/products.html" data-testid="nav-products">Products</a>
+    </nav>
+    <main>
+        <h1>Products</h1>
+        <select data-testid="category-filter" aria-label="Category">
+            <option value="all">All</option>
+            <option value="electronics">Electronics</option>
+            <option value="books">Books</option>
+        </select>
+        <div class="product-grid" id="products"></div>
+    </main>
+    <script>
+        fetch('/api/products.json')
+            .then(r => r.json())
+            .then(data => {
+                const grid = document.getElementById('products');
+                data.products.forEach(p => {
+                    const card = document.createElement('div');
+                    card.className = 'product-card';
+                    card.setAttribute('data-testid', 'product-' + p.id);
+                    card.textContent = p.name + ' - $' + p.price;
+                    grid.appendChild(card);
+                });
+            });
+    </script>
+</body>
+</html>
