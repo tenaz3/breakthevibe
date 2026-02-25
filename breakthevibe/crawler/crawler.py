@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 import structlog
@@ -23,6 +24,7 @@ from breakthevibe.utils.sanitize import is_safe_url
 if TYPE_CHECKING:
     from playwright.async_api import Page
 
+    from breakthevibe.generator.rules.engine import RulesEngine
     from breakthevibe.storage.artifacts import ArtifactStore
 
 logger = structlog.get_logger(__name__)
@@ -40,6 +42,7 @@ class Crawler:
         skip_patterns: list[str] | None = None,
         project_id: str = "",
         run_id: str = "",
+        rules: RulesEngine | None = None,
     ) -> None:
         self._browser = browser or BrowserManager(headless=headless)
         self._artifacts = artifacts
@@ -47,6 +50,14 @@ class Crawler:
         self._skip_patterns = skip_patterns or []
         self._project_id = project_id
         self._run_id = run_id
+        self._rules = rules
+
+        # Apply rules overrides
+        if rules:
+            self._max_depth = rules.get_max_depth()
+            skip_urls = rules.config.crawl.skip_urls
+            if skip_urls:
+                self._skip_patterns = list(set(self._skip_patterns + skip_urls))
 
     async def crawl(self, url: str) -> CrawlResult:
         """Crawl a website starting from the given URL.
@@ -79,9 +90,9 @@ class Crawler:
             context = await self._browser.new_context(video_dir=video_dir)
             page = await self._browser.new_page(context)
 
-            # Install network interception
+            # Install network interception (wrap async callback properly)
             page.on("request", interceptor.on_request)
-            page.on("response", interceptor.on_response)
+            page.on("response", lambda r: asyncio.ensure_future(interceptor.on_response(r)))
 
             while queue:
                 current_url, depth = queue.pop(0)
@@ -100,6 +111,13 @@ class Crawler:
                 discovered = await navigator.discover_links(page)
                 for link in discovered:
                     queue.append((link, depth + 1))
+
+                # Enqueue SPA route changes discovered via History API
+                spa_changes = await navigator.get_spa_route_changes(page)
+                for spa_url in spa_changes:
+                    if navigator.should_visit(spa_url) and navigator.is_within_depth(depth + 1):
+                        queue.append((spa_url, depth + 1))
+                        logger.debug("spa_route_enqueued", url=spa_url, depth=depth + 1)
 
             await context.close()
         finally:
@@ -140,8 +158,14 @@ class Crawler:
         await page.wait_for_load_state("networkidle", timeout=DEFAULT_PAGE_LOAD_TIMEOUT_MS)
         await navigator.install_spa_listener(page)
 
+        # Handle interaction rules (cookie banners, modals)
+        await self._handle_interactions(page)
+
         # Scroll for dynamic content
         await self._scroll_for_content(page)
+
+        # Click interactive elements to discover SPA routes
+        await self._click_interactive_elements(page, navigator)
 
         # Extract components and interactions
         components = await extractor.extract_components(page)
@@ -175,11 +199,6 @@ class Crawler:
         discovered = await navigator.discover_links(page)
         navigates_to = [navigator.get_path(link) for link in discovered]
 
-        # Check for SPA route changes
-        spa_changes = await navigator.get_spa_route_changes(page)
-        if spa_changes:
-            logger.debug("spa_routes_detected", url=url, changes=spa_changes)
-
         return PageData(
             url=url,
             path=navigator.get_path(url),
@@ -191,9 +210,86 @@ class Crawler:
             navigates_to=navigates_to,
         )
 
+    async def _handle_interactions(self, page: Page) -> None:
+        """Handle cookie banners, modals, etc. based on rules."""
+        if not self._rules:
+            return
+
+        # Dismiss cookie banners
+        if self._rules.get_cookie_banner_action() == "dismiss":
+            for selector in [
+                "button:has-text('Accept')",
+                "button:has-text('OK')",
+                "button:has-text('Got it')",
+                "[class*='cookie'] button",
+                "[id*='cookie'] button",
+            ]:
+                try:
+                    locator = page.locator(selector).first
+                    if await locator.is_visible(timeout=1000):
+                        await locator.click()
+                        await page.wait_for_timeout(DEFAULT_AFTER_CLICK_WAIT_MS)
+                        logger.debug("cookie_banner_dismissed", selector=selector)
+                        break
+                except Exception:
+                    continue
+
+        # Close modals
+        if self._rules.get_modal_action() == "close_on_appear":
+            for selector in [
+                "[role='dialog'] button[aria-label='Close']",
+                ".modal-close",
+                "[class*='modal'] button:has-text('Close')",
+            ]:
+                try:
+                    locator = page.locator(selector).first
+                    if await locator.is_visible(timeout=500):
+                        await locator.click()
+                        await page.wait_for_timeout(DEFAULT_AFTER_CLICK_WAIT_MS)
+                        logger.debug("modal_closed", selector=selector)
+                        break
+                except Exception:
+                    continue
+
+    async def _click_interactive_elements(self, page: Page, navigator: Navigator) -> None:
+        """Click navigation elements to trigger SPA route changes."""
+        nav_selectors = [
+            "nav a[href]",
+            "[role='navigation'] a[href]",
+            "header a[href]",
+        ]
+        for selector in nav_selectors:
+            try:
+                links = page.locator(selector)
+                count = await links.count()
+                # Limit to 10 nav links per selector to avoid excessive clicking
+                for i in range(min(count, 10)):
+                    try:
+                        link = links.nth(i)
+                        if not await link.is_visible():
+                            continue
+                        await link.click(timeout=2000)
+                        await page.wait_for_timeout(DEFAULT_AFTER_CLICK_WAIT_MS)
+                        # Navigate back for the next click
+                        await page.go_back(timeout=DEFAULT_PAGE_LOAD_TIMEOUT_MS)
+                        await page.wait_for_timeout(DEFAULT_AFTER_CLICK_WAIT_MS)
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+
     async def _scroll_for_content(self, page: Page) -> None:
         """Scroll incrementally to trigger lazy/infinite-scroll content."""
-        for i in range(MAX_SCROLL_ATTEMPTS):
+        max_scrolls = MAX_SCROLL_ATTEMPTS
+        if self._rules:
+            action = self._rules.get_infinite_scroll_action()
+            # Parse "scroll_N_times" pattern
+            if action.startswith("scroll_") and action.endswith("_times"):
+                parts = action.split("_")
+                if len(parts) >= 2 and parts[1].isdigit():
+                    max_scrolls = int(parts[1])
+
+        for i in range(max_scrolls):
             prev_height = await page.evaluate("document.body.scrollHeight")
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             await page.wait_for_timeout(DEFAULT_SCROLL_WAIT_MS)

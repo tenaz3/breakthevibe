@@ -51,6 +51,7 @@ class CodeBuilder:
             lines.append("import httpx")
         if has_visual:
             lines.append("from pathlib import Path")
+            lines.append("from breakthevibe.reporter.diff import VisualDiff")
 
         lines.extend(["", ""])
 
@@ -95,6 +96,8 @@ class CodeBuilder:
             "import pytest",
             "from pathlib import Path",
             "from playwright.async_api import Page",
+            "",
+            "from breakthevibe.reporter.diff import VisualDiff",
             "",
             "",
             self._generate_function_body(case),
@@ -176,13 +179,21 @@ class CodeBuilder:
         return lines
 
     def _step_to_visual(self, step: TestStep) -> list[str]:
-        """Convert a test step to visual regression code lines."""
+        """Convert a test step to visual regression code lines with diff comparison."""
         lines: list[str] = []
         if step.action == "navigate":
             lines.append(f'    await page.goto("{step.target_url}")')
         elif step.action == "screenshot":
             name = step.expected or "screenshot"
-            lines.append(f'    await page.screenshot(path=str(tmp_path / "{name}.png"))')
+            lines.append(f'    current = tmp_path / "{name}.png"')
+            lines.append("    await page.screenshot(path=str(current))")
+            lines.append(f'    baseline = Path("baselines") / "{name}.png"')
+            lines.append("    if baseline.exists():")
+            lines.append(f'        diff_path = tmp_path / "{name}_diff.png"')
+            lines.append("        diff = VisualDiff().compare(baseline, current, diff_path)")
+            lines.append("        assert diff.matches, (")
+            lines.append('            f"Visual regression: {diff.diff_percentage:.2%} changed"')
+            lines.append("        )")
         return lines
 
     def _build_fallback_locator(self, selectors: list[ResilientSelector], action: str) -> list[str]:

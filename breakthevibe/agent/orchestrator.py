@@ -12,6 +12,8 @@ import structlog
 
 if TYPE_CHECKING:
     from breakthevibe.agent.planner import AgentPlanner
+    from breakthevibe.generator.code_builder import CodeBuilder
+    from breakthevibe.runner.parallel import ParallelScheduler
 
 logger = structlog.get_logger(__name__)
 
@@ -48,6 +50,8 @@ class PipelineOrchestrator:
         runner: Any = None,
         collector: Any = None,
         planner: AgentPlanner | None = None,
+        code_builder: CodeBuilder | None = None,
+        scheduler: ParallelScheduler | None = None,
     ) -> None:
         self._crawler = crawler
         self._mapper = mapper
@@ -55,6 +59,8 @@ class PipelineOrchestrator:
         self._runner = runner
         self._collector = collector
         self._planner = planner
+        self._code_builder = code_builder
+        self._scheduler = scheduler
         self.max_retries: int = 3 if planner else 1
 
     async def run(
@@ -152,7 +158,12 @@ class PipelineOrchestrator:
         )
 
     async def _run_crawl(self, context: dict[str, Any]) -> None:
-        result = await self._crawler.crawl(context["url"])
+        url = context["url"]
+        # Apply adjusted_params from planner (e.g., increased timeout/depth)
+        max_depth = context.get("max_depth")
+        if max_depth is not None:
+            self._crawler._max_depth = int(max_depth)
+        result = await self._crawler.crawl(url)
         context["crawl_result"] = result
 
     async def _run_map(self, context: dict[str, Any]) -> None:
@@ -160,12 +171,58 @@ class PipelineOrchestrator:
         context["sitemap"] = result
 
     async def _run_generate(self, context: dict[str, Any]) -> None:
-        result = await self._generator.generate(context.get("sitemap"))
-        context["test_cases"] = result
+        if not self._generator:
+            logger.warning("no_generator_available", reason="no LLM provider configured")
+            context["test_cases"] = []
+            return
+        cases = await self._generator.generate(context.get("sitemap"))
+        # Generate executable code for each test case
+        if self._code_builder:
+            for case in cases:
+                case.code = self._code_builder.generate(case)
+        context["test_cases"] = cases
 
     async def _run_tests(self, context: dict[str, Any]) -> None:
-        result = await self._runner.run(context.get("test_cases"))
-        context["test_results"] = result
+        cases = context.get("test_cases", [])
+        if not cases:
+            logger.info("no_test_cases_to_run")
+            context["test_results"] = []
+            return
+
+        if not self._runner:
+            logger.warning("no_runner_available")
+            context["test_results"] = []
+            return
+
+        # Use scheduler to create execution plan if available
+        if self._scheduler and self._code_builder:
+            plan = self._scheduler.schedule(cases)
+            results = []
+            for suite in plan.suites:
+                if not suite.cases:
+                    continue
+                suite_code = self._code_builder.generate_suite(suite.cases)
+                if suite_code:
+                    result = await self._runner.run(
+                        suite_name=suite.name,
+                        test_code=suite_code,
+                        workers=suite.workers,
+                    )
+                    results.append(result)
+                    if self._collector:
+                        self._collector.add_execution_result(result)
+            context["test_results"] = results
+        elif self._code_builder:
+            # Fallback: run all tests as a single suite
+            suite_code = self._code_builder.generate_suite(cases)
+            if suite_code:
+                result = await self._runner.run(suite_name="all", test_code=suite_code)
+                if self._collector:
+                    self._collector.add_execution_result(result)
+                context["test_results"] = [result]
+        else:
+            logger.warning("no_code_builder_available")
+            context["test_results"] = []
 
     async def _run_report(self, context: dict[str, Any]) -> None:
         if self._collector:

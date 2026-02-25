@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from breakthevibe.mapper.api_merger import ApiMerger
-from breakthevibe.models.domain import ApiCallInfo, CrawlResult, SiteMap
+from breakthevibe.models.domain import ApiCallInfo, ApiMergeResult, CrawlResult, SiteMap
 
 if TYPE_CHECKING:
     from breakthevibe.mapper.classifier import ComponentClassifier
@@ -53,8 +53,14 @@ class MindMapBuilder:
         all_api_calls = self._deduplicate_api_calls(crawl)
 
         # Merge with OpenAPI spec if available
+        api_merge = None
         if openapi_spec:
             merge_result = self._api_merger.merge(all_api_calls, openapi_spec)
+            api_merge = ApiMergeResult(
+                matched=merge_result.matched,
+                traffic_only=merge_result.traffic_only,
+                spec_only=merge_result.spec_only,
+            )
             logger.info(
                 "api_merge_complete",
                 matched=len(merge_result.matched),
@@ -66,6 +72,7 @@ class MindMapBuilder:
             base_url=base_url,
             pages=crawl.pages,
             api_endpoints=all_api_calls,
+            api_merge=api_merge,
         )
 
     def _deduplicate_api_calls(self, crawl: CrawlResult) -> list[ApiCallInfo]:

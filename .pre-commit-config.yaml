@@ -16,6 +16,13 @@ repos:
         args: [--maxkb=500]
       - id: check-merge-conflict
 
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [pydantic, pydantic-settings]
+        args: [--ignore-missing-imports]
+
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:

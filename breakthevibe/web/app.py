@@ -5,13 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import structlog
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from breakthevibe.config.logging import setup_logging
 from breakthevibe.config.settings import get_settings
+from breakthevibe.web.auth.session import require_auth
 from breakthevibe.web.middleware import RateLimitMiddleware, RequestIDMiddleware
+from breakthevibe.web.routes.auth import router as auth_router
 from breakthevibe.web.routes.crawl import router as crawl_router
 from breakthevibe.web.routes.pages import router as pages_router
 from breakthevibe.web.routes.projects import router as projects_router
@@ -44,18 +46,21 @@ def create_app() -> FastAPI:
     app.add_middleware(RateLimitMiddleware, max_requests=60, window_seconds=60)
     app.add_middleware(RequestIDMiddleware)
 
-    # Routers
-    app.include_router(projects_router)
-    app.include_router(crawl_router)
-    app.include_router(tests_router)
-    app.include_router(results_router)
-    app.include_router(pages_router)
-    app.include_router(settings_router)
+    # Public routes (no auth required)
+    app.include_router(auth_router)
 
-    # Health check
+    # Health check (public)
     @app.get("/api/health")
     async def health_check() -> dict:
         return {"status": "healthy", "version": "0.1.0"}
+
+    # Protected API routes (require session auth)
+    protected = [projects_router, crawl_router, tests_router, results_router, settings_router]
+    for router in protected:
+        app.include_router(router, dependencies=[Depends(require_auth)])
+
+    # Page routes (HTML — auth enforced per-route for flexibility)
+    app.include_router(pages_router)
 
     # Mount static files if directory exists
     static_dir = Path(__file__).parent / "static"

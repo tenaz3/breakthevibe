@@ -47,6 +47,35 @@ llm_settings_repo = _create_llm_settings_repo()
 pipeline_results: dict[str, dict[str, Any]] = {}
 
 
+async def _persist_test_run(project_id: str, result_data: dict[str, Any]) -> None:
+    """Persist test run results to DB when database is enabled."""
+    settings = get_settings()
+    if not settings.use_database:
+        return
+
+    try:
+        from sqlalchemy.ext.asyncio import create_async_engine
+        from sqlmodel.ext.asyncio.session import AsyncSession
+
+        from breakthevibe.models.database import TestRun
+
+        engine = create_async_engine(settings.database_url, echo=settings.debug)
+        async with AsyncSession(engine) as session:
+            test_run = TestRun(
+                project_id=int(project_id),
+                status="completed" if result_data.get("success") else "failed",
+                execution_mode="smart",
+                total=len(result_data.get("completed_stages", [])),
+                passed=1 if result_data.get("success") else 0,
+                failed=0 if result_data.get("success") else 1,
+            )
+            session.add(test_run)
+            await session.commit()
+            logger.info("test_run_persisted", project_id=project_id)
+    except Exception as e:
+        logger.warning("test_run_persist_failed", error=str(e))
+
+
 async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
     """Run the full pipeline as a background task."""
     from breakthevibe.web.pipeline import build_pipeline
@@ -56,8 +85,8 @@ async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
         orchestrator = build_pipeline(project_id=project_id, url=url, rules_yaml=rules_yaml)
         result = await orchestrator.run(project_id=project_id, url=url, rules_yaml=rules_yaml)
 
-        # Store result and update project status
-        pipeline_results[project_id] = {
+        # Store result in memory for immediate access
+        result_data: dict[str, Any] = {
             "run_id": result.run_id,
             "success": result.success,
             "completed_stages": [s.value for s in result.completed_stages],
@@ -65,6 +94,10 @@ async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
             "error_message": result.error_message,
             "duration_seconds": result.duration_seconds,
         }
+        pipeline_results[project_id] = result_data
+
+        # Also persist to DB
+        await _persist_test_run(project_id, result_data)
 
         status = "completed" if result.success else "failed"
         await project_repo.update(project_id, status=status, last_run_id=result.run_id)

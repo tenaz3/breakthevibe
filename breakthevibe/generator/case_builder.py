@@ -98,7 +98,18 @@ class TestCaseGenerator:
 
     def _parse_response(self, content: str) -> list[dict[str, Any]]:
         """Parse LLM response JSON into raw test case dicts."""
-        data = json.loads(content)
+        # Strip markdown code fences if present
+        cleaned = content.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.split("\n")
+            # Remove first and last lines (``` markers)
+            lines = [line for line in lines if not line.strip().startswith("```")]
+            cleaned = "\n".join(lines)
+        try:
+            data = json.loads(cleaned)
+        except json.JSONDecodeError:
+            logger.warning("llm_response_parse_error", content=content[:200])
+            return []
         return data.get("test_cases", [])
 
     def _build_test_case(self, raw: dict[str, Any]) -> GeneratedTestCase:

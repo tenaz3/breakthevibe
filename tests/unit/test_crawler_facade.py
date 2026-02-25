@@ -351,6 +351,12 @@ class TestCrawlerCrawl:
 
 @pytest.mark.unit
 class TestCrawlerScrollForContent:
+    def _make_scroll_crawler(self) -> Crawler:
+        """Create a Crawler instance with _rules=None for scroll testing."""
+        crawler = Crawler.__new__(Crawler)
+        crawler._rules = None
+        return crawler
+
     @pytest.mark.asyncio
     async def test_scroll_calls_evaluate_for_height(self) -> None:
         page = AsyncMock()
@@ -360,7 +366,7 @@ class TestCrawlerScrollForContent:
         page.evaluate = AsyncMock(side_effect=[1000, None, 1000, None])
         page.wait_for_timeout = AsyncMock()
 
-        crawler = Crawler.__new__(Crawler)
+        crawler = self._make_scroll_crawler()
         await crawler._scroll_for_content(page)
 
         assert page.evaluate.await_count >= 1
@@ -373,7 +379,7 @@ class TestCrawlerScrollForContent:
         page.evaluate = AsyncMock(side_effect=[1000, None, 1000, None])
         page.wait_for_timeout = AsyncMock()
 
-        crawler = Crawler.__new__(Crawler)
+        crawler = self._make_scroll_crawler()
         await crawler._scroll_for_content(page)
 
         # Scroll-to-top evaluate is called after the loop
@@ -387,7 +393,7 @@ class TestCrawlerScrollForContent:
         page.evaluate = AsyncMock(side_effect=[1000, None, 1000, None])
         page.wait_for_timeout = AsyncMock()
 
-        crawler = Crawler.__new__(Crawler)
+        crawler = self._make_scroll_crawler()
         await crawler._scroll_for_content(page)
 
         all_scripts = [str(c.args[0]) for c in page.evaluate.call_args_list]
@@ -401,7 +407,7 @@ class TestCrawlerScrollForContent:
         page.evaluate = AsyncMock(side_effect=[1000, None, 1000, None])
         page.wait_for_timeout = AsyncMock()
 
-        crawler = Crawler.__new__(Crawler)
+        crawler = self._make_scroll_crawler()
         await crawler._scroll_for_content(page)
 
         # wait_for_timeout is called at least once with DEFAULT_SCROLL_WAIT_MS
@@ -427,7 +433,7 @@ class TestCrawlerScrollForContent:
         page.evaluate = AsyncMock(side_effect=heights)
         page.wait_for_timeout = AsyncMock()
 
-        crawler = Crawler.__new__(Crawler)
+        crawler = self._make_scroll_crawler()
         await crawler._scroll_for_content(page)
 
         # Should have looped MAX_SCROLL_ATTEMPTS times

@@ -54,10 +54,19 @@ class PageData(BaseModel):
     component_groups: list[dict[str, Any]] = []  # LLM classification groups
 
 
+class ApiMergeResult(BaseModel):
+    """Result of merging observed API traffic with OpenAPI spec."""
+
+    matched: list[ApiCallInfo] = []
+    traffic_only: list[ApiCallInfo] = []
+    spec_only: list[dict[str, Any]] = []
+
+
 class SiteMap(BaseModel):
     base_url: str
     pages: list[PageData] = []
     api_endpoints: list[ApiCallInfo] = []  # deduplicated across all pages
+    api_merge: ApiMergeResult | None = None  # populated when OpenAPI spec is provided
 
 
 class CrawlResult(BaseModel):

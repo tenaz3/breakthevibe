@@ -9,6 +9,7 @@ import time
 from typing import Any
 
 import structlog
+from fastapi import HTTPException, Request
 
 logger = structlog.get_logger(__name__)
 
@@ -64,3 +65,34 @@ class SessionAuth:
     def _sign(self, data: str) -> str:
         """Create HMAC signature for a token."""
         return hmac.new(self._secret, data.encode(), hashlib.sha256).hexdigest()[:32]
+
+
+# Singleton instance — created lazily
+_auth_instance: SessionAuth | None = None
+
+
+def get_session_auth() -> SessionAuth:
+    """Get or create the session auth singleton."""
+    global _auth_instance  # noqa: PLW0603
+    if _auth_instance is None:
+        from breakthevibe.config.settings import get_settings
+
+        settings = get_settings()
+        _auth_instance = SessionAuth(secret_key=settings.secret_key)
+    return _auth_instance
+
+
+async def require_auth(request: Request) -> dict[str, Any]:
+    """FastAPI dependency that enforces session authentication.
+
+    Checks the 'session' cookie for a valid token.
+    Raises 401 if unauthenticated.
+    """
+    auth = get_session_auth()
+    token = request.cookies.get("session")
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    user = auth.validate_session(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    return user
