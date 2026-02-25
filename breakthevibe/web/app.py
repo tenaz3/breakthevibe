@@ -11,8 +11,10 @@ from fastapi.staticfiles import StaticFiles
 
 from breakthevibe.web.middleware import RequestIDMiddleware
 from breakthevibe.web.routes.crawl import router as crawl_router
+from breakthevibe.web.routes.pages import router as pages_router
 from breakthevibe.web.routes.projects import router as projects_router
 from breakthevibe.web.routes.results import router as results_router
+from breakthevibe.web.routes.settings import router as settings_router
 from breakthevibe.web.routes.tests import router as tests_router
 
 logger = structlog.get_logger(__name__)
@@ -41,6 +43,8 @@ def create_app() -> FastAPI:
     app.include_router(crawl_router)
     app.include_router(tests_router)
     app.include_router(results_router)
+    app.include_router(pages_router)
+    app.include_router(settings_router)
 
     # Health check
     @app.get("/api/health")

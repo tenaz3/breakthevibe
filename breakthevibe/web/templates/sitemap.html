@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Mind-Map — {{ project.name }}{% endblock %}
+{% block head %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Site Mind-Map</h1>
+    <a href="/projects/{{ project.id }}" class="btn">Back to Project</a>
+</div>
+<div id="mindmap-container" data-sitemap-url="/api/projects/{{ project.id }}/sitemap"></div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/mindmap.js"></script>
+{% endblock %}
