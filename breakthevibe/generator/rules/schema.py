@@ -21,6 +21,7 @@ class WaitTimesConfig(BaseModel):
 class CrawlRules(BaseModel):
     max_depth: int = 10
     skip_urls: list[str] = Field(default_factory=list)
+    allowed_domains: list[str] = Field(default_factory=list)
     scroll_behavior: str = "incremental"
     wait_times: WaitTimesConfig = Field(default_factory=WaitTimesConfig)
     viewport: ViewportConfig = Field(default_factory=ViewportConfig)
@@ -60,6 +61,7 @@ class SuiteConfig(BaseModel):
 
 class ExecutionRules(BaseModel):
     mode: str = "smart"
+    max_retries: int = 3
     suites: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 

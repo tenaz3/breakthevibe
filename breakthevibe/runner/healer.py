@@ -82,7 +82,7 @@ class SelectorHealer:
         return HealResult(found=False, healed=False)
 
     def _get_locator(self, page: Any, selector: ResilientSelector) -> Any:
-        """Get a Playwright locator from a selector."""
+        """Get a Playwright locator from a selector (#17)."""
         if selector.strategy == SelectorStrategy.TEST_ID:
             return page.get_by_test_id(selector.value)
         elif selector.strategy == SelectorStrategy.ROLE:
@@ -91,5 +91,12 @@ class SelectorHealer:
             return page.get_by_role(selector.value)
         elif selector.strategy == SelectorStrategy.TEXT:
             return page.get_by_text(selector.value)
+        elif selector.strategy == SelectorStrategy.SEMANTIC:
+            # Value is like "nav[Main Navigation]" — extract the tag part
+            tag = selector.value.split("[")[0] if "[" in selector.value else selector.value
+            return page.locator(tag)
+        elif selector.strategy == SelectorStrategy.STRUCTURAL:
+            # Value is a DOM path like "div#app > nav > a"
+            return page.locator(selector.value)
         else:
             return page.locator(selector.value)

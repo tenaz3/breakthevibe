@@ -70,7 +70,8 @@
 {% block scripts %}
 <script src="/static/js/replay.js"></script>
 <script>
-    if (typeof window.__replaySteps !== 'undefined') {
+    window.__replaySteps = {{ replay_steps_json|safe }};
+    if (typeof window.loadReplaySteps === 'function') {
         window.loadReplaySteps(window.__replaySteps);
     }
 </script>

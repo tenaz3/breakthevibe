@@ -176,6 +176,15 @@ class CodeBuilder:
             lines.append(f'        response = await client.{method.lower()}("{step.target_url}")')
         elif step.action == "assert_status":
             lines.append(f"        assert response.status_code == {step.expected}")
+        elif step.action == "assert_body":
+            # Validate response body structure (#21)
+            if isinstance(step.expected, dict):
+                for key in step.expected:
+                    lines.append(f'        assert "{key}" in response.json()')
+            elif isinstance(step.expected, str):
+                lines.append(f'        assert "{step.expected}" in response.json()')
+            else:
+                lines.append("        assert response.json() is not None")
         return lines
 
     def _step_to_visual(self, step: TestStep) -> list[str]:
@@ -227,7 +236,7 @@ class CodeBuilder:
         return self._single_locator(selectors[0])
 
     def _single_locator(self, sel: ResilientSelector) -> str:
-        """Convert a single selector to a Playwright locator string."""
+        """Convert a single selector to a Playwright locator string (#17)."""
         if sel.strategy == SelectorStrategy.TEST_ID:
             return f'page.get_by_test_id("{sel.value}")'
         elif sel.strategy == SelectorStrategy.ROLE:
@@ -236,7 +245,10 @@ class CodeBuilder:
             return f'page.get_by_role("{sel.value}")'
         elif sel.strategy == SelectorStrategy.TEXT:
             return f'page.get_by_text("{sel.value}")'
-        elif sel.strategy == SelectorStrategy.CSS:
+        elif sel.strategy == SelectorStrategy.SEMANTIC:
+            tag = sel.value.split("[")[0] if "[" in sel.value else sel.value
+            return f'page.locator("{tag}")'
+        elif sel.strategy in (SelectorStrategy.STRUCTURAL, SelectorStrategy.CSS):
             return f'page.locator("{sel.value}")'
         else:
             return f'page.locator("{sel.value}")'

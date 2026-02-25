@@ -85,6 +85,7 @@ def build_pipeline(
         planner=planner,
         code_builder=code_builder,
         scheduler=scheduler,
+        max_retries=rules.get_max_retries(),
     )
 
     logger.info("pipeline_built", project_id=project_id, has_llm=llm is not None)

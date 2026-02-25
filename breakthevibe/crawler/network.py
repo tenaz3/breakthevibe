@@ -13,6 +13,11 @@ class NetworkInterceptor:
     def __init__(self) -> None:
         self._calls: list[dict[str, Any]] = []
         self._pending: dict[str, dict[str, Any]] = {}
+        self._current_action: str | None = None
+
+    def set_current_action(self, action: str | None) -> None:
+        """Set the current UI action label for attribution."""
+        self._current_action = action
 
     def on_request(self, request: Any) -> None:
         """Handle intercepted request."""
@@ -27,6 +32,7 @@ class NetworkInterceptor:
             "status_code": None,
             "response_headers": {},
             "response_body": None,
+            "triggered_by": self._current_action,
         }
         self._pending[request.url] = call_data
         self._calls.append(call_data)

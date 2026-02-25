@@ -9,6 +9,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 import structlog
+from structlog.contextvars import bind_contextvars, unbind_contextvars
 
 if TYPE_CHECKING:
     from breakthevibe.agent.planner import AgentPlanner
@@ -37,6 +38,7 @@ class PipelineResult:
     failed_stage: PipelineStage | None = None
     error_message: str = ""
     duration_seconds: float = 0.0
+    report: Any = None  # TestRunReport from ResultCollector
 
 
 class PipelineOrchestrator:
@@ -52,6 +54,7 @@ class PipelineOrchestrator:
         planner: AgentPlanner | None = None,
         code_builder: CodeBuilder | None = None,
         scheduler: ParallelScheduler | None = None,
+        max_retries: int | None = None,
     ) -> None:
         self._crawler = crawler
         self._mapper = mapper
@@ -61,7 +64,8 @@ class PipelineOrchestrator:
         self._planner = planner
         self._code_builder = code_builder
         self._scheduler = scheduler
-        self.max_retries: int = 3 if planner else 1
+        # Use explicit max_retries if provided, otherwise default based on planner
+        self.max_retries: int = max_retries if max_retries is not None else (3 if planner else 1)
 
     async def run(
         self,
@@ -73,6 +77,9 @@ class PipelineOrchestrator:
         run_id = str(uuid.uuid4())
         start = time.monotonic()
         completed: list[PipelineStage] = []
+
+        # Bind correlation ID for all logs within this pipeline run (#12)
+        bind_contextvars(pipeline_run_id=run_id, pipeline_project_id=project_id)
 
         logger.info("pipeline_started", project_id=project_id, run_id=run_id, url=url)
 
@@ -137,6 +144,7 @@ class PipelineOrchestrator:
             if not success:
                 duration = time.monotonic() - start
                 logger.error("pipeline_failed", stage=stage.value, error=last_error)
+                unbind_contextvars("pipeline_run_id", "pipeline_project_id")
                 return PipelineResult(
                     project_id=project_id,
                     run_id=run_id,
@@ -149,12 +157,14 @@ class PipelineOrchestrator:
 
         duration = time.monotonic() - start
         logger.info("pipeline_completed", run_id=run_id, duration=duration)
+        unbind_contextvars("pipeline_run_id", "pipeline_project_id")
         return PipelineResult(
             project_id=project_id,
             run_id=run_id,
             success=True,
             completed_stages=completed,
             duration_seconds=duration,
+            report=context.get("report"),
         )
 
     async def _run_crawl(self, context: dict[str, Any]) -> None:
@@ -169,6 +179,29 @@ class PipelineOrchestrator:
     async def _run_map(self, context: dict[str, Any]) -> None:
         result = await self._mapper.build(context.get("crawl_result"), context["url"])
         context["sitemap"] = result
+
+        # Persist sitemap to DB (#11)
+        try:
+            from breakthevibe.config.settings import get_settings
+
+            settings = get_settings()
+            if settings.use_database:
+                from sqlalchemy.ext.asyncio import create_async_engine
+                from sqlmodel.ext.asyncio.session import AsyncSession
+
+                from breakthevibe.models.database import CrawlRun
+
+                engine = create_async_engine(settings.database_url, echo=settings.debug)
+                async with AsyncSession(engine) as session:
+                    crawl_run = CrawlRun(
+                        project_id=int(context["project_id"]),
+                        status="completed",
+                        site_map_json=result.model_dump_json(),
+                    )
+                    session.add(crawl_run)
+                    await session.commit()
+        except Exception as e:
+            logger.warning("sitemap_persist_failed", error=str(e))
 
     async def _run_generate(self, context: dict[str, Any]) -> None:
         if not self._generator:
@@ -226,7 +259,8 @@ class PipelineOrchestrator:
 
     async def _run_report(self, context: dict[str, Any]) -> None:
         if self._collector:
-            self._collector.build_report(
+            report = self._collector.build_report(
                 project_id=context["project_id"],
                 run_id=context.get("run_id", "auto"),
             )
+            context["report"] = report

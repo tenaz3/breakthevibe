@@ -19,12 +19,12 @@ class ArtifactStore:
     def __init__(self, base_dir: Path | None = None) -> None:
         from pathlib import Path as _Path
 
-        self._base = base_dir or _Path.home() / ".breakthevibe" / "artifacts"
+        self._base = base_dir or _Path.home() / ".breakthevibe" / "projects"
         self._base.mkdir(parents=True, exist_ok=True)
 
     def get_project_dir(self, project_id: str) -> Path:
         """Get or create project artifact directory."""
-        path = self._base / project_id
+        path = self._base / project_id / "artifacts"
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -75,21 +75,21 @@ class ArtifactStore:
 
     def cleanup_run(self, project_id: str, run_id: str) -> None:
         """Delete all artifacts for a specific run."""
-        run_dir = self._base / project_id / run_id
+        run_dir = self._base / project_id / "artifacts" / run_id
         if run_dir.exists():
             shutil.rmtree(run_dir)
             logger.info("run_artifacts_cleaned", project=project_id, run=run_id)
 
     def cleanup_project(self, project_id: str) -> None:
         """Delete all artifacts for a project."""
-        project_dir = self._base / project_id
+        project_dir = self._base / project_id / "artifacts"
         if project_dir.exists():
             shutil.rmtree(project_dir)
             logger.info("project_artifacts_cleaned", project=project_id)
 
     def get_disk_usage(self, project_id: str) -> int:
         """Get total disk usage in bytes for a project."""
-        project_dir = self._base / project_id
+        project_dir = self._base / project_id / "artifacts"
         if not project_dir.exists():
             return 0
         return sum(f.stat().st_size for f in project_dir.rglob("*") if f.is_file())

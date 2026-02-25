@@ -85,7 +85,8 @@ async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
         orchestrator = build_pipeline(project_id=project_id, url=url, rules_yaml=rules_yaml)
         result = await orchestrator.run(project_id=project_id, url=url, rules_yaml=rules_yaml)
 
-        # Store result in memory for immediate access
+        # Build rich result data including report details
+        report = result.report
         result_data: dict[str, Any] = {
             "run_id": result.run_id,
             "success": result.success,
@@ -94,6 +95,30 @@ async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
             "error_message": result.error_message,
             "duration_seconds": result.duration_seconds,
         }
+        if report:
+            result_data["total"] = report.total_suites
+            result_data["passed"] = report.passed_suites
+            result_data["failed"] = report.failed_suites
+            result_data["status"] = report.overall_status.value
+            result_data["heal_warnings"] = report.heal_warnings
+            result_data["suites"] = [
+                {
+                    "name": r.suite_name,
+                    "success": r.success,
+                    "stdout": r.stdout,
+                    "duration": r.duration_seconds,
+                    "step_captures": [
+                        {
+                            "name": sc.name,
+                            "screenshot_path": sc.screenshot_path,
+                            "network_calls": sc.network_calls,
+                            "console_logs": sc.console_logs,
+                        }
+                        for sc in r.step_captures
+                    ],
+                }
+                for r in report.results
+            ]
         pipeline_results[project_id] = result_data
 
         # Also persist to DB

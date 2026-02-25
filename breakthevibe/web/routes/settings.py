@@ -80,6 +80,14 @@ async def update_llm_settings(request: Request) -> dict:
     if form.get("default_model"):
         updates["default_model"] = str(form["default_model"])
 
+    # Save API keys (#13)
+    if form.get("anthropic_api_key"):
+        updates["anthropic_api_key"] = str(form["anthropic_api_key"])
+    if form.get("openai_api_key"):
+        updates["openai_api_key"] = str(form["openai_api_key"])
+    if form.get("ollama_base_url"):
+        updates["ollama_base_url"] = str(form["ollama_base_url"])
+
     # Per-module settings are stored as nested dicts
     current = await llm_settings_repo.get_all()
     modules = current.get("modules", {})

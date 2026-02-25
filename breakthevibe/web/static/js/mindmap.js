@@ -24,10 +24,50 @@
 
         pages.forEach((page) => {
             const routeNode = { name: page.path || page.url, children: [] };
+
+            // Components group
             const components = page.components || [];
-            components.forEach((comp) => {
-                routeNode.children.push({ name: comp.name, type: "component" });
-            });
+            if (components.length > 0) {
+                const compGroup = { name: "Components", type: "group_components", children: [] };
+                components.forEach((comp) => {
+                    compGroup.children.push({ name: comp.name, type: "component" });
+                });
+                routeNode.children.push(compGroup);
+            }
+
+            // Interactions group
+            const interactions = page.interactions || [];
+            if (interactions.length > 0) {
+                const intGroup = { name: "Interactions", type: "group_interactions", children: [] };
+                interactions.forEach((intr) => {
+                    intGroup.children.push({ name: intr.name + " (" + intr.action_type + ")", type: "interaction" });
+                });
+                routeNode.children.push(intGroup);
+            }
+
+            // API calls group
+            const apiCalls = page.api_calls || [];
+            if (apiCalls.length > 0) {
+                const apiGroup = { name: "API Calls", type: "group_api", children: [] };
+                apiCalls.forEach((call) => {
+                    const label = (call.method || "GET") + " " + (call.url || "").split("?")[0];
+                    apiGroup.children.push({ name: label, type: "api_call" });
+                });
+                routeNode.children.push(apiGroup);
+            }
+
+            // Screenshot/Video reference
+            if (page.screenshot_path || page.video_path) {
+                const mediaGroup = { name: "Screenshots/Video", type: "group_media", children: [] };
+                if (page.screenshot_path) {
+                    mediaGroup.children.push({ name: "Screenshot", type: "screenshot" });
+                }
+                if (page.video_path) {
+                    mediaGroup.children.push({ name: "Video", type: "video" });
+                }
+                routeNode.children.push(mediaGroup);
+            }
+
             root.children.push(routeNode);
         });
 
@@ -77,11 +117,21 @@
             .attr("class", "node")
             .attr("transform", (d) => `translate(${d.y},${d.x})`);
 
+        const typeColors = {
+            component: "#22c55e",
+            interaction: "#f59e0b",
+            api_call: "#ef4444",
+            screenshot: "#8b5cf6",
+            video: "#ec4899",
+            group_components: "#22c55e",
+            group_interactions: "#f59e0b",
+            group_api: "#ef4444",
+            group_media: "#8b5cf6",
+        };
+
         node.append("circle")
-            .attr("r", 5)
-            .attr("fill", (d) =>
-                d.data.type === "component" ? "#22c55e" : "#6366f1"
-            );
+            .attr("r", (d) => d.data.type && d.data.type.startsWith("group_") ? 6 : 5)
+            .attr("fill", (d) => typeColors[d.data.type] || "#6366f1");
 
         node.append("text")
             .attr("dy", "0.31em")

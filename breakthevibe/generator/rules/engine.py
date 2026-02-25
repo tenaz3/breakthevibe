@@ -89,6 +89,14 @@ class RulesEngine:
         """Get maximum crawl depth."""
         return self._config.crawl.max_depth
 
+    def get_allowed_domains(self) -> list[str]:
+        """Get allowed domains for crawling (#19)."""
+        return list(self._config.crawl.allowed_domains)
+
+    def get_max_retries(self) -> int:
+        """Get max retries from execution config (#22)."""
+        return self._config.execution.max_retries
+
     def to_yaml(self) -> str:
         """Serialize rules back to YAML."""
         return self._config.to_yaml()

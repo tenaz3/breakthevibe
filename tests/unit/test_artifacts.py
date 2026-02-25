@@ -65,8 +65,8 @@ class TestArtifactStore:
     def test_cleanup_project(self, store: ArtifactStore) -> None:
         store.save_screenshot("proj-1", "run-1", "step_01", b"img")
         store.cleanup_project("proj-1")
-        project_dir = store._base / "proj-1"
-        assert not project_dir.exists()
+        artifacts_dir = store._base / "proj-1" / "artifacts"
+        assert not artifacts_dir.exists()
 
     def test_get_disk_usage(self, store: ArtifactStore) -> None:
         store.save_screenshot("proj-1", "run-1", "step_01", b"x" * 1000)

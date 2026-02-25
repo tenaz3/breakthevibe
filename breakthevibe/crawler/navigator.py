@@ -56,23 +56,28 @@ class Navigator:
         base_url: str,
         max_depth: int = DEFAULT_MAX_DEPTH,
         skip_patterns: list[str] | None = None,
+        allowed_domains: list[str] | None = None,
     ):
         self._base_url = base_url.rstrip("/")
         self._max_depth = max_depth
         self._skip_patterns = skip_patterns or []
         self._visited: set[str] = set()
         self._base_domain = urlparse(base_url).netloc
+        # Allowed domains includes the base domain plus any configured (#19)
+        self._allowed_domains: set[str] = {self._base_domain}
+        if allowed_domains:
+            self._allowed_domains.update(allowed_domains)
 
     def should_skip(self, path: str) -> bool:
         """Check if path matches any skip pattern."""
         return any(fnmatch.fnmatch(path, pattern) for pattern in self._skip_patterns)
 
     def should_visit(self, url: str) -> bool:
-        """Check if URL should be visited (same domain, not visited, not skipped)."""
+        """Check if URL should be visited (allowed domain, not visited, not skipped)."""
         if url in self._visited:
             return False
         parsed = urlparse(url)
-        if parsed.netloc != self._base_domain:
+        if parsed.netloc not in self._allowed_domains:
             return False
         path = parsed.path or "/"
         return not self.should_skip(path)

@@ -122,29 +122,80 @@ class TestExecutor:
         return test_file
 
     def _write_capture_conftest(self, suite_name: str) -> None:
-        """Write a conftest.py that captures per-step screenshots and logs."""
+        """Write a conftest.py that captures per-step screenshots, network, and console."""
         captures_dir = self._output_dir / f"{suite_name}_captures"
         captures_dir.mkdir(exist_ok=True)
+
+        # Escape backslashes for Windows paths
+        captures_dir_str = str(captures_dir).replace("\\", "\\\\")
 
         conftest = self._output_dir / "conftest.py"
         conftest.write_text(f"""\
 \"\"\"Auto-generated conftest for per-step capture.\"\"\"
+import asyncio
 import json
 from pathlib import Path
 
 import pytest
 
-CAPTURES_DIR = Path("{captures_dir}")
-_step_data = []
+CAPTURES_DIR = Path("{captures_dir_str}")
+
+
+@pytest.fixture()
+def page(browser):
+    \"\"\"Create a page with video recording in the captures directory.\"\"\"
+    context = browser.new_context(record_video_dir=str(CAPTURES_DIR))
+    pg = context.new_page()
+    yield pg
+    context.close()
 
 
 @pytest.fixture(autouse=True)
 def _capture_step_data(request):
-    \"\"\"Capture per-test metadata.\"\"\"
-    step = {{"name": request.node.name, "screenshots": [], "console": []}}
-    _step_data.append(step)
+    \"\"\"Capture per-test network calls, console logs, and screenshot.\"\"\"
+    # Check if the test has a 'page' fixture
+    page = request.getfixturevalue("page") if "page" in request.fixturenames else None
+
+    network_calls = []
+    console_logs = []
+
+    if page:
+        def _on_request(req):
+            if req.resource_type in ("xhr", "fetch"):
+                network_calls.append({{"url": req.url, "method": req.method}})
+
+        def _on_response(resp):
+            for call in network_calls:
+                if call["url"] == resp.url:
+                    call["status"] = resp.status
+                    break
+
+        def _on_console(msg):
+            console_logs.append(f"[{{msg.type}}] {{msg.text}}")
+
+        page.on("request", _on_request)
+        page.on("response", _on_response)
+        page.on("console", _on_console)
+
     yield
-    # Write captures after each test
+
+    # Take post-test screenshot
+    screenshot_path = None
+    if page:
+        try:
+            ss_path = CAPTURES_DIR / f"{{request.node.name}}.png"
+            page.screenshot(path=str(ss_path))
+            screenshot_path = str(ss_path)
+        except Exception:
+            pass
+
+    # Write captures
+    step = {{
+        "name": request.node.name,
+        "screenshot_path": screenshot_path,
+        "network_calls": network_calls,
+        "console": console_logs,
+    }}
     out = CAPTURES_DIR / f"{{request.node.name}}.json"
     out.write_text(json.dumps(step, default=str))
 """)
@@ -172,7 +223,7 @@ def _capture_step_data(request):
         return captures
 
     def _build_command(self, test_file: Path, workers: int) -> list[str]:
-        """Build the pytest command."""
+        """Build the pytest command with retry and parallel support."""
         cmd = [
             sys.executable,
             "-m",
@@ -180,6 +231,8 @@ def _capture_step_data(request):
             str(test_file),
             "-v",
             "--tb=short",
+            "--reruns=1",
+            "--reruns-delay=2",
         ]
         if workers > 1:
             cmd.extend(["-n", str(workers)])

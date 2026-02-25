@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from typing import TYPE_CHECKING
 
 import structlog
@@ -68,10 +69,12 @@ class Crawler:
             logger.warning("unsafe_url_blocked", url=url)
             return CrawlResult(pages=[], total_routes=0, total_components=0, total_api_calls=0)
 
+        allowed_domains = self._rules.get_allowed_domains() if self._rules else []
         navigator = Navigator(
             base_url=url,
             max_depth=self._max_depth,
             skip_patterns=self._skip_patterns,
+            allowed_domains=allowed_domains,
         )
         extractor = ComponentExtractor()
         interceptor = NetworkInterceptor()
@@ -87,13 +90,6 @@ class Crawler:
                 videos_dir.mkdir(parents=True, exist_ok=True)
                 video_dir = str(videos_dir)
 
-            context = await self._browser.new_context(video_dir=video_dir)
-            page = await self._browser.new_page(context)
-
-            # Install network interception (wrap async callback properly)
-            page.on("request", interceptor.on_request)
-            page.on("response", lambda r: asyncio.ensure_future(interceptor.on_response(r)))
-
             while queue:
                 current_url, depth = queue.pop(0)
                 if not navigator.should_visit(current_url):
@@ -102,24 +98,40 @@ class Crawler:
                     continue
 
                 navigator.mark_visited(current_url)
+
+                # Create a new context per route for video segmentation (#7)
+                context = await self._browser.new_context(video_dir=video_dir)
+                page = await self._browser.new_page(context)
+
+                # Install network interception
+                page.on("request", interceptor.on_request)
+                page.on("response", lambda r: asyncio.ensure_future(interceptor.on_response(r)))
+
                 page_data = await self._crawl_page(
                     page, current_url, navigator, extractor, interceptor, depth
                 )
+
+                # Close context to finalize per-route video
+                video_obj = page.video
+                await context.close()
+
+                # Assign video path from Playwright (#7)
+                if video_obj:
+                    with contextlib.suppress(Exception):
+                        page_data.video_path = await video_obj.path()
+
                 pages.append(page_data)
 
                 # Discover links for further crawling
-                discovered = await navigator.discover_links(page)
-                for link in discovered:
-                    queue.append((link, depth + 1))
+                # (links were already discovered in _crawl_page, get from page_data)
+                for link_path in page_data.navigates_to:
+                    full_url = navigator._base_url + link_path
+                    if navigator.should_visit(full_url):
+                        queue.append((full_url, depth + 1))
 
                 # Enqueue SPA route changes discovered via History API
-                spa_changes = await navigator.get_spa_route_changes(page)
-                for spa_url in spa_changes:
-                    if navigator.should_visit(spa_url) and navigator.is_within_depth(depth + 1):
-                        queue.append((spa_url, depth + 1))
-                        logger.debug("spa_route_enqueued", url=spa_url, depth=depth + 1)
+                # (SPA routes were already enqueued in _crawl_page's link discovery)
 
-            await context.close()
         finally:
             await self._browser.close()
 
@@ -154,18 +166,23 @@ class Crawler:
         logger.info("crawling_page", url=url, depth=depth)
         interceptor.clear()
 
+        # Tag network calls with current action (#6)
+        interceptor.set_current_action(f"navigate:{url}")
         await page.goto(url, timeout=DEFAULT_PAGE_LOAD_TIMEOUT_MS)
         await page.wait_for_load_state("networkidle", timeout=DEFAULT_PAGE_LOAD_TIMEOUT_MS)
         await navigator.install_spa_listener(page)
 
         # Handle interaction rules (cookie banners, modals)
+        interceptor.set_current_action("interaction:cookie_modal")
         await self._handle_interactions(page)
 
         # Scroll for dynamic content
+        interceptor.set_current_action("interaction:scroll")
         await self._scroll_for_content(page)
 
         # Click interactive elements to discover SPA routes
-        await self._click_interactive_elements(page, navigator)
+        await self._click_interactive_elements(page, navigator, interceptor, extractor)
+        interceptor.set_current_action(None)
 
         # Extract components and interactions
         components = await extractor.extract_components(page)
@@ -181,7 +198,7 @@ class Crawler:
             )
             screenshot_path = str(saved)
 
-        # Build API call domain objects from interceptor data
+        # Build API call domain objects from interceptor data (with triggered_by #6)
         api_calls = [
             ApiCallInfo(
                 url=call["url"],
@@ -191,15 +208,21 @@ class Crawler:
                 response_headers=call.get("response_headers", {}),
                 request_body=call.get("request_body"),
                 response_body=call.get("response_body"),
+                triggered_by=call.get("triggered_by"),
             )
             for call in interceptor.get_captured_calls()
         ]
 
-        # Detect links this page navigates to
+        # Detect links this page navigates to (before context closes)
         discovered = await navigator.discover_links(page)
         navigates_to = [navigator.get_path(link) for link in discovered]
 
-        return PageData(
+        # Collect SPA route changes discovered via History API
+        spa_changes = await navigator.get_spa_route_changes(page)
+        spa_navigates = [navigator.get_path(spa_url) for spa_url in spa_changes]
+        navigates_to = list(set(navigates_to + spa_navigates))
+
+        page_data = PageData(
             url=url,
             path=navigator.get_path(url),
             title=await page.title(),
@@ -209,6 +232,21 @@ class Crawler:
             screenshot_path=screenshot_path,
             navigates_to=navigates_to,
         )
+
+        # Write per-route JSON artifact to disk (#18)
+        if self._artifacts and self._project_id and self._run_id:
+            try:
+                route_name = navigator.get_path(url).replace("/", "_").strip("_") or "index"
+                json_dir = (
+                    self._artifacts.get_run_dir(self._project_id, self._run_id) / "route_data"
+                )
+                json_dir.mkdir(exist_ok=True)
+                json_file = json_dir / f"{route_name}.json"
+                json_file.write_text(page_data.model_dump_json(indent=2))
+            except Exception as e:
+                logger.debug("route_json_write_failed", error=str(e))
+
+        return page_data
 
     async def _handle_interactions(self, page: Page) -> None:
         """Handle cookie banners, modals, etc. based on rules."""
@@ -251,13 +289,20 @@ class Crawler:
                 except Exception:
                     continue
 
-    async def _click_interactive_elements(self, page: Page, navigator: Navigator) -> None:
+    async def _click_interactive_elements(
+        self,
+        page: Page,
+        navigator: Navigator,
+        interceptor: NetworkInterceptor | None = None,
+        extractor: ComponentExtractor | None = None,
+    ) -> None:
         """Click navigation elements to trigger SPA route changes."""
         nav_selectors = [
             "nav a[href]",
             "[role='navigation'] a[href]",
             "header a[href]",
         ]
+        click_index = 0
         for selector in nav_selectors:
             try:
                 links = page.locator(selector)
@@ -268,8 +313,42 @@ class Crawler:
                         link = links.nth(i)
                         if not await link.is_visible():
                             continue
+                        link_text = (await link.text_content() or "").strip()[:30]
+
+                        # Tag network calls with this click action (#6)
+                        if interceptor:
+                            interceptor.set_current_action(f"click:{link_text or selector}")
+
+                        # Screenshot before click (#8)
+                        if self._artifacts and self._project_id and self._run_id and extractor:
+                            try:
+                                ss_data = await extractor.take_screenshot(page, "")
+                                self._artifacts.save_screenshot(
+                                    self._project_id,
+                                    self._run_id,
+                                    f"before_click_{click_index}",
+                                    ss_data,
+                                )
+                            except Exception:
+                                pass
+
                         await link.click(timeout=2000)
                         await page.wait_for_timeout(DEFAULT_AFTER_CLICK_WAIT_MS)
+
+                        # Screenshot after click (#8)
+                        if self._artifacts and self._project_id and self._run_id and extractor:
+                            try:
+                                ss_data = await extractor.take_screenshot(page, "")
+                                self._artifacts.save_screenshot(
+                                    self._project_id,
+                                    self._run_id,
+                                    f"after_click_{click_index}",
+                                    ss_data,
+                                )
+                            except Exception:
+                                pass
+
+                        click_index += 1
                         # Navigate back for the next click
                         await page.go_back(timeout=DEFAULT_PAGE_LOAD_TIMEOUT_MS)
                         await page.wait_for_timeout(DEFAULT_AFTER_CLICK_WAIT_MS)

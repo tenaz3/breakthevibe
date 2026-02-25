@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Test Suites — {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Test Suites</h1>
+    <a href="/projects/{{ project.id }}" class="btn">Back to Project</a>
+</div>
+
+<!-- Filter by category -->
+<div style="margin-bottom:1.5rem;display:flex;gap:0.75rem;flex-wrap:wrap">
+    <a href="?category=" class="btn {% if not category %}btn-primary{% endif %}">All</a>
+    <a href="?category=functional" class="btn {% if category == 'functional' %}btn-primary{% endif %}">Functional</a>
+    <a href="?category=visual" class="btn {% if category == 'visual' %}btn-primary{% endif %}">Visual</a>
+    <a href="?category=api" class="btn {% if category == 'api' %}btn-primary{% endif %}">API</a>
+</div>
+
+{% if suites_by_route %}
+{% for route, suites in suites_by_route.items() %}
+<div class="card" style="margin-bottom:1rem">
+    <h3 style="margin-bottom:0.75rem">{{ route }}</h3>
+    <table style="width:100%;border-collapse:collapse">
+        <thead>
+            <tr style="border-bottom:1px solid var(--border)">
+                <th style="text-align:left;padding:0.5rem">Suite</th>
+                <th style="text-align:left;padding:0.5rem">Category</th>
+                <th style="text-align:left;padding:0.5rem">Steps</th>
+                <th style="text-align:right;padding:0.5rem">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for suite in suites %}
+            <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:0.5rem">{{ suite.name }}</td>
+                <td style="padding:0.5rem"><span class="badge">{{ suite.category }}</span></td>
+                <td style="padding:0.5rem">{{ suite.step_count }}</td>
+                <td style="padding:0.5rem;text-align:right">
+                    <button class="btn btn-sm" onclick="toggleCode('code-{{ loop.index0 }}-{{ loop.parent.loop.index0 }}')">View Code</button>
+                </td>
+            </tr>
+            <tr id="code-{{ loop.index0 }}-{{ loop.parent.loop.index0 }}" style="display:none">
+                <td colspan="4" style="padding:0.5rem">
+                    <pre style="background:var(--bg-secondary);padding:1rem;border-radius:0.5rem;overflow-x:auto;font-size:0.85rem"><code>{{ suite.code }}</code></pre>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endfor %}
+{% else %}
+<p class="text-muted">No test suites generated yet. Run the pipeline to generate tests.</p>
+{% endif %}
+
+<!-- Inline rules editor -->
+<div class="card" style="margin-top:2rem">
+    <h3 style="margin-bottom:0.75rem">Rules (Quick Edit)</h3>
+    <form hx-put="/api/projects/{{ project.id }}/rules" hx-swap="none"
+          hx-on::after-request="if(event.detail.successful) alert('Rules saved')">
+        <textarea name="rules_yaml" rows="10"
+                  style="width:100%;background:var(--bg-secondary);color:var(--text);border:1px solid var(--border);border-radius:0.5rem;padding:0.75rem;font-family:monospace;font-size:0.85rem"
+        >{{ rules_yaml }}</textarea>
+        <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
+            <button type="submit" class="btn btn-primary">Save Rules</button>
+            <button type="button" class="btn"
+                    hx-post="/api/rules/validate"
+                    hx-vals='js:{"yaml": document.querySelector("[name=rules_yaml]").value}'
+                    hx-target="#validate-result"
+                    hx-swap="innerHTML">Validate</button>
+            <span id="validate-result" class="text-muted" style="line-height:2.2"></span>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function toggleCode(id) {
+    const row = document.getElementById(id);
+    row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+</script>
+{% endblock %}

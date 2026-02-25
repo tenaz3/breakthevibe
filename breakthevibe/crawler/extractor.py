@@ -64,7 +64,13 @@ class ComponentExtractor:
     """Extracts components and interactions from a Playwright page."""
 
     async def extract_components(self, page: Page) -> list[ComponentInfo]:
-        """Extract all meaningful components from the page DOM."""
+        """Extract all meaningful components via DOM analysis + accessibility snapshot (#15)."""
+        # Playwright accessibility tree for richer semantic structure
+        try:
+            self._a11y_snapshot = await page.accessibility.snapshot()  # type: ignore[union-attr]
+        except Exception:
+            self._a11y_snapshot = None
+
         raw_elements: list[dict[str, Any]] = await page.evaluate(EXTRACT_JS)
         components = []
         for el in raw_elements:

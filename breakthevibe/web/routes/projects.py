@@ -6,6 +6,7 @@ import structlog
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, HttpUrl
 
+from breakthevibe.utils.sanitize import is_safe_url
 from breakthevibe.web.dependencies import project_repo
 
 logger = structlog.get_logger(__name__)
@@ -31,6 +32,9 @@ class ProjectResponse(BaseModel):
 
 @router.post("", status_code=201, response_model=ProjectResponse)
 async def create_project(body: CreateProjectRequest) -> dict:
+    # SSRF protection (#14)
+    if not is_safe_url(str(body.url)):
+        raise HTTPException(status_code=422, detail="URL targets a private or reserved IP address")
     project = await project_repo.create(
         name=body.name,
         url=str(body.url),
