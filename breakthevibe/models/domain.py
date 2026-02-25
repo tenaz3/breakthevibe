@@ -1,5 +1,7 @@
 """Inter-module data contracts (not persisted directly)."""
 
+from typing import Any
+
 from pydantic import BaseModel
 
 from breakthevibe.types import SelectorStrategy, TestCategory
@@ -34,8 +36,8 @@ class ApiCallInfo(BaseModel):
     status_code: int | None = None
     request_headers: dict[str, str] = {}
     response_headers: dict[str, str] = {}
-    request_body: str | None = None
-    response_body: str | None = None
+    request_body: Any | None = None
+    response_body: Any | None = None
     triggered_by: str | None = None  # component/interaction that triggered it
 
 
@@ -65,16 +67,19 @@ class CrawlResult(BaseModel):
 
 
 class TestStep(BaseModel):
-    action: str  # navigate, click, fill, assert, scroll, wait
+    action: str  # navigate, click, fill, assert_url, assert_text, api_call, screenshot
     selectors: list[ResilientSelector] = []
-    target: str | None = None  # URL for navigate, value for fill
-    assertion_type: str | None = None  # url_contains, element_visible, text_equals
-    assertion_value: str | None = None
+    target_url: str | None = None  # URL for navigate/api_call
+    expected: Any | None = None  # expected value for assertions
+    method: str | None = None  # HTTP method for api_call
+    name: str | None = None  # screenshot name
+    description: str = ""
 
 
 class GeneratedTestCase(BaseModel):
     name: str
     category: TestCategory
-    route_path: str
+    description: str = ""
+    route: str
     steps: list[TestStep]
-    code: str  # executable pytest code
+    code: str = ""  # executable pytest code (populated by code generator)

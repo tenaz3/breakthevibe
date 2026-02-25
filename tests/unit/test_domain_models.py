@@ -66,8 +66,8 @@ class TestDomainModels:
         tc = GeneratedTestCase(
             name="Login test",
             category=TestCategory.FUNCTIONAL,
-            route_path="/login",
-            steps=[TestStep(action="navigate", target="/login")],
+            route="/login",
+            steps=[TestStep(action="navigate", target_url="/login")],
             code="def test_login(): pass",
         )
         assert tc.category == TestCategory.FUNCTIONAL
