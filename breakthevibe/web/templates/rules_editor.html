@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Rules Editor — BreakTheVibe{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Rules Editor</h1>
+    <a href="/projects/{{ project.id }}" class="btn">Back to Project</a>
+</div>
+
+<form hx-put="/api/projects/{{ project.id }}/rules"
+      hx-target="#save-status" hx-swap="innerHTML"
+      enctype="application/x-www-form-urlencoded">
+    <textarea class="code-editor" name="rules_yaml" spellcheck="false">{{ rules_yaml }}</textarea>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Rules</button>
+        <button type="button" class="btn" id="validate-btn">Validate</button>
+        <button type="button" class="btn" id="reset-btn">Reset to Defaults</button>
+    </div>
+    <div id="save-status" style="margin-top:0.5rem"></div>
+</form>
+
+<details class="card" style="margin-top:1.5rem" open>
+    <summary style="cursor:pointer"><strong>Configuration Reference</strong></summary>
+    <div style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-muted)">
+        <pre>crawl:
+  max_depth: 5           # Maximum crawl depth
+  skip_urls: []          # Glob patterns to skip
+  scroll_behavior: auto  # auto | none | full
+  viewport: [1280, 720]  # Width, height
+  wait_times:
+    page_load: 3000      # ms to wait after navigation
+    network_idle: 1000   # ms to wait for network idle
+
+inputs:
+  email: "test@example.com"
+  password: "Test123!"
+
+interactions:
+  cookie_banner: dismiss
+  modals: close
+  infinite_scroll: false
+
+tests:
+  skip_visual: ["*/admin/*"]
+
+api:
+  ignore_endpoints: ["*/analytics*"]
+  expected_overrides:
+    "GET /api/users": { status: 200 }
+
+execution:
+  mode: smart           # smart | sequential | parallel
+  suites:
+    api_tests: { workers: 4 }</pre>
+    </div>
+</details>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('validate-btn')?.addEventListener('click', function() {
+    var yaml = document.querySelector('.code-editor').value;
+    fetch('/api/rules/validate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({yaml: yaml})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        var status = document.getElementById('save-status');
+        status.textContent = '';
+        var span = document.createElement('span');
+        if (data.valid) {
+            span.style.color = 'var(--success)';
+            span.textContent = 'Valid YAML configuration';
+        } else {
+            span.style.color = 'var(--danger)';
+            span.textContent = 'Invalid: ' + data.error;
+        }
+        status.appendChild(span);
+    });
+});
+document.getElementById('reset-btn')?.addEventListener('click', function() {
+    document.querySelector('.code-editor').value = '';
+});
+</script>
+{% endblock %}
