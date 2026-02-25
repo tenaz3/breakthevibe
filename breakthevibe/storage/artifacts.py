@@ -52,18 +52,14 @@ class ArtifactStore:
         diffs_dir.mkdir(exist_ok=True)
         return diffs_dir / f"{diff_name}.png"
 
-    def save_screenshot(
-        self, project_id: str, run_id: str, step_name: str, data: bytes
-    ) -> Path:
+    def save_screenshot(self, project_id: str, run_id: str, step_name: str, data: bytes) -> Path:
         """Save screenshot data to file."""
         path = self.screenshot_path(project_id, run_id, step_name)
         path.write_bytes(data)
         logger.debug("screenshot_saved", path=str(path), size=len(data))
         return path
 
-    def save_video(
-        self, project_id: str, run_id: str, video_name: str, data: bytes
-    ) -> Path:
+    def save_video(self, project_id: str, run_id: str, video_name: str, data: bytes) -> Path:
         """Save video data to file."""
         path = self.video_path(project_id, run_id, video_name)
         path.write_bytes(data)

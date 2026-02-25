@@ -18,9 +18,7 @@ logger = structlog.get_logger(__name__)
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Adds a unique X-Request-ID header to every response."""
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         request_id = request.headers.get("x-request-id", str(uuid.uuid4()))
         structlog.contextvars.bind_contextvars(request_id=request_id)
         response = await call_next(request)

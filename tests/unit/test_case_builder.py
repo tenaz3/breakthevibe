@@ -28,12 +28,8 @@ SAMPLE_SITEMAP = SiteMap(
                     name="CTA Button",
                     element_type="button",
                     selectors=[
-                        ResilientSelector(
-                            strategy=SelectorStrategy.TEST_ID, value="cta-btn"
-                        ),
-                        ResilientSelector(
-                            strategy=SelectorStrategy.TEXT, value="Get Started"
-                        ),
+                        ResilientSelector(strategy=SelectorStrategy.TEST_ID, value="cta-btn"),
+                        ResilientSelector(strategy=SelectorStrategy.TEXT, value="Get Started"),
                     ],
                     aria_role="button",
                     text_content="Get Started",
@@ -77,12 +73,8 @@ SAMPLE_SITEMAP = SiteMap(
         ),
     ],
     api_endpoints=[
-        ApiCallInfo(
-            url="https://example.com/api/featured", method="GET", status_code=200
-        ),
-        ApiCallInfo(
-            url="https://example.com/api/products", method="GET", status_code=200
-        ),
+        ApiCallInfo(url="https://example.com/api/featured", method="GET", status_code=200),
+        ApiCallInfo(url="https://example.com/api/products", method="GET", status_code=200),
     ],
 )
 
@@ -183,15 +175,11 @@ class TestTestCaseGenerator:
         return RulesEngine(RulesConfig.from_yaml(RULES_YAML))
 
     @pytest.fixture()
-    def generator(
-        self, mock_llm: AsyncMock, rules: RulesEngine
-    ) -> TestCaseGenerator:
+    def generator(self, mock_llm: AsyncMock, rules: RulesEngine) -> TestCaseGenerator:
         return TestCaseGenerator(llm=mock_llm, rules=rules)
 
     @pytest.mark.asyncio
-    async def test_generates_test_cases(
-        self, generator: TestCaseGenerator
-    ) -> None:
+    async def test_generates_test_cases(self, generator: TestCaseGenerator) -> None:
         cases = await generator.generate(SAMPLE_SITEMAP)
         assert len(cases) == 3
         categories = {c.category for c in cases}
@@ -200,9 +188,7 @@ class TestTestCaseGenerator:
         assert TestCategory.VISUAL in categories
 
     @pytest.mark.asyncio
-    async def test_functional_test_has_steps(
-        self, generator: TestCaseGenerator
-    ) -> None:
+    async def test_functional_test_has_steps(self, generator: TestCaseGenerator) -> None:
         cases = await generator.generate(SAMPLE_SITEMAP)
         functional = [c for c in cases if c.category == TestCategory.FUNCTIONAL]
         assert len(functional) == 1
@@ -210,9 +196,7 @@ class TestTestCaseGenerator:
         assert functional[0].steps[0].action == "navigate"
 
     @pytest.mark.asyncio
-    async def test_api_test_has_steps(
-        self, generator: TestCaseGenerator
-    ) -> None:
+    async def test_api_test_has_steps(self, generator: TestCaseGenerator) -> None:
         cases = await generator.generate(SAMPLE_SITEMAP)
         api_tests = [c for c in cases if c.category == TestCategory.API]
         assert len(api_tests) == 1

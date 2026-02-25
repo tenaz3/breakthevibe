@@ -42,10 +42,7 @@ class TestCaseGenerator:
         logger.info(
             "generated_test_cases",
             count=len(cases),
-            categories={
-                c.value: sum(1 for tc in cases if tc.category == c)
-                for c in TestCategory
-            },
+            categories={c.value: sum(1 for tc in cases if tc.category == c) for c in TestCategory},
         )
         return cases
 
@@ -54,9 +51,7 @@ class TestCaseGenerator:
         pages_desc = []
         for page in sitemap.pages:
             components_desc = ", ".join(c.name for c in page.components)
-            api_desc = ", ".join(
-                f"{a.method} {a.url}" for a in page.api_calls
-            )
+            api_desc = ", ".join(f"{a.method} {a.url}" for a in page.api_calls)
             pages_desc.append(
                 f"Route: {page.path} (title: {page.title})\n"
                 f"  Components: [{components_desc}]\n"
@@ -64,8 +59,7 @@ class TestCaseGenerator:
             )
 
         api_endpoints_desc = "\n".join(
-            f"  - {e.method} {e.url} (status: {e.status_code})"
-            for e in sitemap.api_endpoints
+            f"  - {e.method} {e.url} (status: {e.status_code})" for e in sitemap.api_endpoints
         )
 
         return (
@@ -139,19 +133,12 @@ class TestCaseGenerator:
             steps=steps,
         )
 
-    def _apply_rules(
-        self, cases: list[GeneratedTestCase]
-    ) -> list[GeneratedTestCase]:
+    def _apply_rules(self, cases: list[GeneratedTestCase]) -> list[GeneratedTestCase]:
         """Filter test cases based on rules engine."""
         filtered = []
         for case in cases:
-            if (
-                case.category == TestCategory.VISUAL
-                and self._rules.should_skip_visual(case.route)
-            ):
-                logger.debug(
-                    "skipping_visual_test", route=case.route, test=case.name
-                )
+            if case.category == TestCategory.VISUAL and self._rules.should_skip_visual(case.route):
+                logger.debug("skipping_visual_test", route=case.route, test=case.name)
                 continue
             filtered.append(case)
         return filtered

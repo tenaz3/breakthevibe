@@ -7,9 +7,7 @@ from breakthevibe.runner.parallel import ExecutionPlan, ParallelScheduler
 from breakthevibe.types import TestCategory
 
 
-def _make_case(
-    name: str, category: TestCategory, route: str
-) -> GeneratedTestCase:
+def _make_case(name: str, category: TestCategory, route: str) -> GeneratedTestCase:
     return GeneratedTestCase(
         name=name,
         category=category,
@@ -116,12 +114,8 @@ class TestParallelScheduler:
             },
         )
 
-        auth_suite = next(
-            (s for s in plan.suites if s.name == "auth-flow"), None
-        )
-        product_suite = next(
-            (s for s in plan.suites if s.name == "product-pages"), None
-        )
+        auth_suite = next((s for s in plan.suites if s.name == "auth-flow"), None)
+        product_suite = next((s for s in plan.suites if s.name == "product-pages"), None)
 
         assert auth_suite is not None
         assert auth_suite.workers == 1  # sequential
@@ -140,9 +134,7 @@ class TestParallelScheduler:
 
         plan = scheduler.schedule(cases)
         api_suites = [
-            s
-            for s in plan.suites
-            if any(c.category == TestCategory.API for c in s.cases)
+            s for s in plan.suites if any(c.category == TestCategory.API for c in s.cases)
         ]
         assert len(api_suites) >= 1
         assert api_suites[0].workers > 1 or len(api_suites[0].cases) <= 1

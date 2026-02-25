@@ -40,9 +40,7 @@ class HealResult:
 class SelectorHealer:
     """Tries selectors in priority order, healing when preferred ones fail."""
 
-    async def find_element(
-        self, page: Any, selectors: list[ResilientSelector]
-    ) -> HealResult:
+    async def find_element(self, page: Any, selectors: list[ResilientSelector]) -> HealResult:
         """Try each selector in order until one finds an element."""
         if not selectors:
             return HealResult(found=False, healed=False)

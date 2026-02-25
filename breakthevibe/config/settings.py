@@ -9,9 +9,7 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     # Database
-    database_url: str = (
-        "postgresql+asyncpg://breakthevibe:breakthevibe@localhost:5432/breakthevibe"
-    )
+    database_url: str = "postgresql+asyncpg://breakthevibe:breakthevibe@localhost:5432/breakthevibe"
 
     # App
     secret_key: str = "change-me-in-production"

@@ -46,8 +46,7 @@ class ComponentClassifier:
             for c in components
         )
         prompt = (
-            f"Page: {page_url}\n\nComponents found:\n{component_summary}\n\n"
-            f"Group these components."
+            f"Page: {page_url}\n\nComponents found:\n{component_summary}\n\nGroup these components."
         )
 
         response = await self._llm.generate_structured(

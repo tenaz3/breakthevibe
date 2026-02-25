@@ -16,16 +16,10 @@ class TestSelectorHealer:
     @pytest.fixture()
     def selector_chain(self) -> list[ResilientSelector]:
         return [
-            ResilientSelector(
-                strategy=SelectorStrategy.TEST_ID, value="submit-btn"
-            ),
-            ResilientSelector(
-                strategy=SelectorStrategy.ROLE, value="button", name="Submit"
-            ),
+            ResilientSelector(strategy=SelectorStrategy.TEST_ID, value="submit-btn"),
+            ResilientSelector(strategy=SelectorStrategy.ROLE, value="button", name="Submit"),
             ResilientSelector(strategy=SelectorStrategy.TEXT, value="Submit"),
-            ResilientSelector(
-                strategy=SelectorStrategy.CSS, value=".btn-submit"
-            ),
+            ResilientSelector(strategy=SelectorStrategy.CSS, value=".btn-submit"),
         ]
 
     @pytest.mark.asyncio
@@ -120,9 +114,7 @@ class TestSelectorHealer:
         result = HealResult(
             found=True,
             healed=True,
-            used_selector=ResilientSelector(
-                strategy=SelectorStrategy.CSS, value=".btn"
-            ),
+            used_selector=ResilientSelector(strategy=SelectorStrategy.CSS, value=".btn"),
             original_selector=ResilientSelector(
                 strategy=SelectorStrategy.TEST_ID, value="submit-btn"
             ),
@@ -136,31 +128,23 @@ class TestSelectorHealer:
         result = HealResult(
             found=True,
             healed=False,
-            used_selector=ResilientSelector(
-                strategy=SelectorStrategy.TEST_ID, value="btn"
-            ),
+            used_selector=ResilientSelector(strategy=SelectorStrategy.TEST_ID, value="btn"),
         )
         assert result.warning_message() is None
 
     @pytest.mark.asyncio
-    async def test_empty_selector_chain(
-        self, healer: SelectorHealer
-    ) -> None:
+    async def test_empty_selector_chain(self, healer: SelectorHealer) -> None:
         mock_page = MagicMock()
         result = await healer.find_element(mock_page, [])
         assert result.found is False
 
     @pytest.mark.asyncio
-    async def test_handles_locator_exception(
-        self, healer: SelectorHealer
-    ) -> None:
+    async def test_handles_locator_exception(self, healer: SelectorHealer) -> None:
         """If a locator throws, treat it as not found and continue."""
         mock_page = MagicMock()
 
         mock_error_locator = MagicMock()
-        mock_error_locator.count = AsyncMock(
-            side_effect=Exception("element detached")
-        )
+        mock_error_locator.count = AsyncMock(side_effect=Exception("element detached"))
 
         mock_ok_locator = MagicMock()
         mock_ok_locator.count = AsyncMock(return_value=1)
@@ -169,12 +153,8 @@ class TestSelectorHealer:
         mock_page.get_by_role.return_value = mock_ok_locator
 
         chain = [
-            ResilientSelector(
-                strategy=SelectorStrategy.TEST_ID, value="btn"
-            ),
-            ResilientSelector(
-                strategy=SelectorStrategy.ROLE, value="button", name="Submit"
-            ),
+            ResilientSelector(strategy=SelectorStrategy.TEST_ID, value="btn"),
+            ResilientSelector(strategy=SelectorStrategy.ROLE, value="button", name="Submit"),
         ]
         result = await healer.find_element(mock_page, chain)
         assert result.found is True

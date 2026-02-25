@@ -14,11 +14,13 @@ class TestAgentPlanner:
     def mock_llm(self) -> AsyncMock:
         llm = AsyncMock()
         llm.generate.return_value = LLMResponse(
-            content=json.dumps({
-                "should_retry": True,
-                "reason": "Transient network error, retrying with longer timeout",
-                "adjusted_params": {"timeout": 10000},
-            }),
+            content=json.dumps(
+                {
+                    "should_retry": True,
+                    "reason": "Transient network error, retrying with longer timeout",
+                    "adjusted_params": {"timeout": 10000},
+                }
+            ),
             model="test-model",
             tokens_used=80,
         )
@@ -29,9 +31,7 @@ class TestAgentPlanner:
         return AgentPlanner(llm=mock_llm)
 
     @pytest.mark.asyncio
-    async def test_decides_retry_on_transient(
-        self, planner: AgentPlanner
-    ) -> None:
+    async def test_decides_retry_on_transient(self, planner: AgentPlanner) -> None:
         decision = await planner.analyze_failure(
             stage=PipelineStage.CRAWL,
             error="ConnectionError: Connection timed out",
@@ -46,11 +46,13 @@ class TestAgentPlanner:
         self, planner: AgentPlanner, mock_llm: AsyncMock
     ) -> None:
         mock_llm.generate.return_value = LLMResponse(
-            content=json.dumps({
-                "should_retry": False,
-                "reason": "Invalid URL - permanent failure",
-                "adjusted_params": {},
-            }),
+            content=json.dumps(
+                {
+                    "should_retry": False,
+                    "reason": "Invalid URL - permanent failure",
+                    "adjusted_params": {},
+                }
+            ),
             model="test-model",
             tokens_used=80,
         )
@@ -62,9 +64,7 @@ class TestAgentPlanner:
         assert decision.should_retry is False
 
     @pytest.mark.asyncio
-    async def test_includes_adjusted_params(
-        self, planner: AgentPlanner
-    ) -> None:
+    async def test_includes_adjusted_params(self, planner: AgentPlanner) -> None:
         decision = await planner.analyze_failure(
             stage=PipelineStage.CRAWL,
             error="Timeout",
@@ -103,9 +103,7 @@ class TestAgentPlanner:
         assert decision.should_retry is False
 
     @pytest.mark.asyncio
-    async def test_max_attempts_forces_no_retry(
-        self, planner: AgentPlanner
-    ) -> None:
+    async def test_max_attempts_forces_no_retry(self, planner: AgentPlanner) -> None:
         planner.max_attempts = 3
         decision = await planner.analyze_failure(
             stage=PipelineStage.CRAWL,

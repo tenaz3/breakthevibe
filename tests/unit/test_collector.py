@@ -84,12 +84,8 @@ class TestResultCollector:
         heal = HealResult(
             found=True,
             healed=True,
-            used_selector=ResilientSelector(
-                strategy=SelectorStrategy.CSS, value=".btn"
-            ),
-            original_selector=ResilientSelector(
-                strategy=SelectorStrategy.TEST_ID, value="submit"
-            ),
+            used_selector=ResilientSelector(strategy=SelectorStrategy.CSS, value=".btn"),
+            original_selector=ResilientSelector(strategy=SelectorStrategy.TEST_ID, value="submit"),
         )
         collector.add_execution_result(passing_result)
         collector.add_heal_warning("test_home", heal)

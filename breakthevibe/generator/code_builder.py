@@ -35,9 +35,7 @@ class CodeBuilder:
 
     def generate_suite(self, cases: list[GeneratedTestCase]) -> str:
         """Generate a complete test file from multiple test cases."""
-        has_functional = any(
-            c.category == TestCategory.FUNCTIONAL for c in cases
-        )
+        has_functional = any(c.category == TestCategory.FUNCTIONAL for c in cases)
         has_api = any(c.category == TestCategory.API for c in cases)
         has_visual = any(c.category == TestCategory.VISUAL for c in cases)
 
@@ -164,9 +162,7 @@ class CodeBuilder:
             lines.append(f'    assert page.url == "{step.expected}"')
         elif step.action == "assert_text":
             locator = self._build_locator(step.selectors)
-            lines.append(
-                f'    await expect({locator}).to_have_text("{step.expected}")'
-            )
+            lines.append(f'    await expect({locator}).to_have_text("{step.expected}")')
         return lines
 
     def _step_to_httpx(self, step: TestStep) -> list[str]:
@@ -176,14 +172,9 @@ class CodeBuilder:
             method = "GET"
             if isinstance(step.expected, dict):
                 method = step.expected.get("method", "GET")
-            lines.append(
-                f"        response = await client."
-                f'{method.lower()}("{step.target_url}")'
-            )
+            lines.append(f'        response = await client.{method.lower()}("{step.target_url}")')
         elif step.action == "assert_status":
-            lines.append(
-                f"        assert response.status_code == {step.expected}"
-            )
+            lines.append(f"        assert response.status_code == {step.expected}")
         return lines
 
     def _step_to_visual(self, step: TestStep) -> list[str]:
@@ -193,9 +184,7 @@ class CodeBuilder:
             lines.append(f'    await page.goto("{step.target_url}")')
         elif step.action == "screenshot":
             name = step.expected or "screenshot"
-            lines.append(
-                f'    await page.screenshot(path=str(tmp_path / "{name}.png"))'
-            )
+            lines.append(f'    await page.screenshot(path=str(tmp_path / "{name}.png"))')
         return lines
 
     def _build_locator(self, selectors: list[ResilientSelector]) -> str:
@@ -208,9 +197,7 @@ class CodeBuilder:
             return f'page.get_by_test_id("{sel.value}")'
         elif sel.strategy == SelectorStrategy.ROLE:
             if sel.name:
-                return (
-                    f'page.get_by_role("{sel.value}", name="{sel.name}")'
-                )
+                return f'page.get_by_role("{sel.value}", name="{sel.name}")'
             return f'page.get_by_role("{sel.value}")'
         elif sel.strategy == SelectorStrategy.TEXT:
             return f'page.get_by_text("{sel.value}")'

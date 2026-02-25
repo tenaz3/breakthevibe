@@ -15,9 +15,9 @@ class TestTestExecutor:
     @pytest.fixture()
     def sample_test_code(self) -> str:
         return (
-            'import pytest\n\n'
-            '@pytest.mark.asyncio\n'
-            'async def test_example(page):\n'
+            "import pytest\n\n"
+            "@pytest.mark.asyncio\n"
+            "async def test_example(page):\n"
             '    """Simple test."""\n'
             '    await page.goto("https://example.com")\n'
             '    assert page.url == "https://example.com/"\n'
@@ -34,9 +34,7 @@ class TestTestExecutor:
         assert test_file.name == "test_example_suite.py"
         assert test_file.read_text() == sample_test_code
 
-    def test_builds_pytest_command(
-        self, executor: TestExecutor, tmp_path: Path
-    ) -> None:
+    def test_builds_pytest_command(self, executor: TestExecutor, tmp_path: Path) -> None:
         test_file = tmp_path / "test_sample.py"
         test_file.write_text("# test")
         cmd = executor._build_command(test_file, workers=1)
@@ -44,9 +42,7 @@ class TestTestExecutor:
         assert str(test_file) in cmd
         assert "-v" in cmd
 
-    def test_builds_parallel_command(
-        self, executor: TestExecutor, tmp_path: Path
-    ) -> None:
+    def test_builds_parallel_command(self, executor: TestExecutor, tmp_path: Path) -> None:
         test_file = tmp_path / "test_sample.py"
         test_file.write_text("# test")
         cmd = executor._build_command(test_file, workers=4)

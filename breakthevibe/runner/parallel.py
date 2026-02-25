@@ -67,28 +67,18 @@ class ParallelScheduler:
         else:  # smart
             return self._schedule_smart(cases)
 
-    def _schedule_sequential(
-        self, cases: list[GeneratedTestCase]
-    ) -> ExecutionPlan:
+    def _schedule_sequential(self, cases: list[GeneratedTestCase]) -> ExecutionPlan:
         """All tests in one sequential suite."""
-        return ExecutionPlan(
-            suites=[SuiteSchedule(name="all", cases=cases, workers=1)]
-        )
+        return ExecutionPlan(suites=[SuiteSchedule(name="all", cases=cases, workers=1)])
 
-    def _schedule_parallel(
-        self, cases: list[GeneratedTestCase]
-    ) -> ExecutionPlan:
+    def _schedule_parallel(self, cases: list[GeneratedTestCase]) -> ExecutionPlan:
         """All tests in one parallel suite with max workers."""
         workers = min(len(cases), self._max_workers)
         return ExecutionPlan(
-            suites=[
-                SuiteSchedule(name="all", cases=cases, workers=max(workers, 1))
-            ]
+            suites=[SuiteSchedule(name="all", cases=cases, workers=max(workers, 1))]
         )
 
-    def _schedule_smart(
-        self, cases: list[GeneratedTestCase]
-    ) -> ExecutionPlan:
+    def _schedule_smart(self, cases: list[GeneratedTestCase]) -> ExecutionPlan:
         """Group by category and route, decide workers per group."""
         suites: list[SuiteSchedule] = []
 
@@ -149,11 +139,7 @@ class ParallelScheduler:
             config = self._rules.get_suite_config(suite_name)
             if config:
                 mode = config.get("mode", "smart")
-                workers = (
-                    1
-                    if mode == "sequential"
-                    else config.get("workers", self._max_workers)
-                )
+                workers = 1 if mode == "sequential" else config.get("workers", self._max_workers)
                 shared = config.get("shared_context", False)
             else:
                 workers = 1
@@ -169,8 +155,6 @@ class ParallelScheduler:
             )
 
         if unassigned:
-            suites.append(
-                SuiteSchedule(name="unassigned", cases=unassigned, workers=1)
-            )
+            suites.append(SuiteSchedule(name="unassigned", cases=unassigned, workers=1))
 
         return ExecutionPlan(suites=suites)

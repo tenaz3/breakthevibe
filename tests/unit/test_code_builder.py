@@ -31,12 +31,8 @@ class TestCodeBuilder:
                 TestStep(
                     action="click",
                     selectors=[
-                        ResilientSelector(
-                            strategy=SelectorStrategy.TEST_ID, value="cta-btn"
-                        ),
-                        ResilientSelector(
-                            strategy=SelectorStrategy.TEXT, value="Get Started"
-                        ),
+                        ResilientSelector(strategy=SelectorStrategy.TEST_ID, value="cta-btn"),
+                        ResilientSelector(strategy=SelectorStrategy.TEXT, value="Get Started"),
                     ],
                     description="Click CTA button",
                 ),

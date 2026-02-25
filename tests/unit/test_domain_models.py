@@ -25,9 +25,7 @@ class TestDomainModels:
         comp = ComponentInfo(
             name="navbar",
             element_type="nav",
-            selectors=[
-                ResilientSelector(strategy=SelectorStrategy.ROLE, value="navigation")
-            ],
+            selectors=[ResilientSelector(strategy=SelectorStrategy.ROLE, value="navigation")],
         )
         assert comp.name == "navbar"
         assert len(comp.selectors) == 1

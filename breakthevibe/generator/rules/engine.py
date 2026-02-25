@@ -48,9 +48,7 @@ class RulesEngine:
         """Check if an API endpoint should be ignored (supports glob)."""
         return any(fnmatch.fnmatch(endpoint, p) for p in self._config.api.ignore_endpoints)
 
-    def get_expected_override(
-        self, method: str, path: str
-    ) -> dict[str, Any] | None:
+    def get_expected_override(self, method: str, path: str) -> dict[str, Any] | None:
         """Get expected response override for a specific endpoint."""
         key = f"{method} {path}"
         return self._config.api.expected_overrides.get(key)

@@ -26,9 +26,7 @@ class TestPipelineOrchestrator:
         return PipelineOrchestrator(**mock_components)
 
     @pytest.mark.asyncio
-    async def test_full_pipeline_success(
-        self, orchestrator: PipelineOrchestrator
-    ) -> None:
+    async def test_full_pipeline_success(self, orchestrator: PipelineOrchestrator) -> None:
         result = await orchestrator.run(
             project_id="proj-1",
             url="https://example.com",
@@ -76,9 +74,7 @@ class TestPipelineOrchestrator:
         assert result.failed_stage == PipelineStage.GENERATE
 
     @pytest.mark.asyncio
-    async def test_pipeline_records_duration(
-        self, orchestrator: PipelineOrchestrator
-    ) -> None:
+    async def test_pipeline_records_duration(self, orchestrator: PipelineOrchestrator) -> None:
         result = await orchestrator.run(
             project_id="proj-1",
             url="https://example.com",

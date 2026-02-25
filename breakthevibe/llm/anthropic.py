@@ -34,8 +34,6 @@ class AnthropicProvider(LLMProviderBase):
         self, prompt: str, system: str | None = None, max_tokens: int = 4096
     ) -> LLMResponse:
         system_with_json = (
-            (system or "") + "\nRespond ONLY with valid JSON. No markdown, no explanation."
-        )
-        return await self.generate(
-            prompt, system=system_with_json.strip(), max_tokens=max_tokens
-        )
+            system or ""
+        ) + "\nRespond ONLY with valid JSON. No markdown, no explanation."
+        return await self.generate(prompt, system=system_with_json.strip(), max_tokens=max_tokens)

@@ -68,11 +68,7 @@ class VisualDiff:
         current_pixels = current.load()
 
         # Create diff image if output requested
-        diff_img = (
-            Image.new("RGB", (width, height), color=(0, 0, 0))
-            if output_path
-            else None
-        )
+        diff_img = Image.new("RGB", (width, height), color=(0, 0, 0)) if output_path else None
         diff_pixels = diff_img.load() if diff_img else None
 
         for y in range(height):

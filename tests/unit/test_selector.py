@@ -17,9 +17,7 @@ class TestSelectorBuilder:
             element_type="button",
             selectors=[
                 ResilientSelector(strategy=SelectorStrategy.CSS, value=".btn-primary"),
-                ResilientSelector(
-                    strategy=SelectorStrategy.TEST_ID, value="add-to-cart-btn"
-                ),
+                ResilientSelector(strategy=SelectorStrategy.TEST_ID, value="add-to-cart-btn"),
                 ResilientSelector(strategy=SelectorStrategy.TEXT, value="Add to Cart"),
                 ResilientSelector(
                     strategy=SelectorStrategy.ROLE, value="button", name="Add to Cart"
@@ -65,9 +63,7 @@ class TestSelectorBuilder:
             name="Submit",
             element_type="button",
             selectors=[
-                ResilientSelector(
-                    strategy=SelectorStrategy.CSS, value="form .submit-btn"
-                ),
+                ResilientSelector(strategy=SelectorStrategy.CSS, value="form .submit-btn"),
             ],
             aria_role="button",
             text_content="Submit",
@@ -92,13 +88,9 @@ class TestSelectorBuilder:
                     strategy=SelectorStrategy.STRUCTURAL,
                     value="nav > ul > li:nth-child(2) > a",
                 ),
-                ResilientSelector(
-                    strategy=SelectorStrategy.SEMANTIC, value="nav a[href='/about']"
-                ),
+                ResilientSelector(strategy=SelectorStrategy.SEMANTIC, value="nav a[href='/about']"),
                 ResilientSelector(strategy=SelectorStrategy.TEXT, value="About"),
-                ResilientSelector(
-                    strategy=SelectorStrategy.ROLE, value="link", name="About"
-                ),
+                ResilientSelector(strategy=SelectorStrategy.ROLE, value="link", name="About"),
                 ResilientSelector(strategy=SelectorStrategy.TEST_ID, value="about-link"),
             ],
         )

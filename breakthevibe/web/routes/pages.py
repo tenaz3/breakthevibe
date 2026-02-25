@@ -18,9 +18,7 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templa
 @router.get("/", response_class=HTMLResponse)
 async def projects_page(request: Request) -> HTMLResponse:
     projects = await project_repo.list_all()
-    return templates.TemplateResponse(
-        "projects.html", {"request": request, "projects": projects}
-    )
+    return templates.TemplateResponse("projects.html", {"request": request, "projects": projects})
 
 
 @router.get("/projects/{project_id}", response_class=HTMLResponse)
@@ -38,6 +36,4 @@ async def sitemap_page(request: Request, project_id: str) -> HTMLResponse:
     project = await project_repo.get(project_id)
     if not project:
         return HTMLResponse(content="Project not found", status_code=404)
-    return templates.TemplateResponse(
-        "sitemap.html", {"request": request, "project": project}
-    )
+    return templates.TemplateResponse("sitemap.html", {"request": request, "project": project})

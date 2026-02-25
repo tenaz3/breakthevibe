@@ -53,10 +53,7 @@ class SelectorBuilder:
         inferred: list[ResilientSelector] = []
 
         # Infer test_id selector
-        if (
-            SelectorStrategy.TEST_ID not in existing_strategies
-            and component.test_id
-        ):
+        if SelectorStrategy.TEST_ID not in existing_strategies and component.test_id:
             inferred.append(
                 ResilientSelector(
                     strategy=SelectorStrategy.TEST_ID,
@@ -65,10 +62,7 @@ class SelectorBuilder:
             )
 
         # Infer role selector
-        if (
-            SelectorStrategy.ROLE not in existing_strategies
-            and component.aria_role
-        ):
+        if SelectorStrategy.ROLE not in existing_strategies and component.aria_role:
             inferred.append(
                 ResilientSelector(
                     strategy=SelectorStrategy.ROLE,
@@ -78,10 +72,7 @@ class SelectorBuilder:
             )
 
         # Infer text selector
-        if (
-            SelectorStrategy.TEXT not in existing_strategies
-            and component.text_content
-        ):
+        if SelectorStrategy.TEXT not in existing_strategies and component.text_content:
             inferred.append(
                 ResilientSelector(
                     strategy=SelectorStrategy.TEXT,

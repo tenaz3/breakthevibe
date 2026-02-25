@@ -53,11 +53,7 @@ class TestRunReport:
     def overall_status(self) -> TestStatus:
         if not self.results:
             return TestStatus.PASSED
-        return (
-            TestStatus.PASSED
-            if all(r.success for r in self.results)
-            else TestStatus.FAILED
-        )
+        return TestStatus.PASSED if all(r.success for r in self.results) else TestStatus.FAILED
 
     @property
     def total_duration(self) -> float:
@@ -82,20 +78,14 @@ class ResultCollector:
             duration=result.duration_seconds,
         )
 
-    def add_heal_warning(
-        self, suite_name: str, heal_result: HealResult
-    ) -> None:
+    def add_heal_warning(self, suite_name: str, heal_result: HealResult) -> None:
         """Record a healed selector warning."""
         msg = heal_result.warning_message()
         if msg:
             self._heal_warnings.append(msg)
-            logger.warning(
-                "heal_warning_recorded", suite=suite_name, message=msg
-            )
+            logger.warning("heal_warning_recorded", suite=suite_name, message=msg)
 
-    def add_screenshot(
-        self, suite_name: str, step_name: str, path: Path
-    ) -> None:
+    def add_screenshot(self, suite_name: str, step_name: str, path: Path) -> None:
         """Add a screenshot reference."""
         self._screenshots.append(
             ScreenshotRef(

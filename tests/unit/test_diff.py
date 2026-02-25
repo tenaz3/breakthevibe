@@ -34,9 +34,7 @@ class TestVisualDiff:
         return baseline, current
 
     @pytest.fixture()
-    def slightly_different_images(
-        self, tmp_path: Path
-    ) -> tuple[Path, Path]:
+    def slightly_different_images(self, tmp_path: Path) -> tuple[Path, Path]:
         """Create two images with minor differences."""
         baseline_img = Image.new("RGB", (100, 100), color=(255, 0, 0))
         current_img = Image.new("RGB", (100, 100), color=(255, 0, 0))
@@ -92,9 +90,7 @@ class TestVisualDiff:
         # 25 pixels out of 10000 = 0.25% which is below 10% threshold
         assert result.matches is True
 
-    def test_different_size_images(
-        self, differ: VisualDiff, tmp_path: Path
-    ) -> None:
+    def test_different_size_images(self, differ: VisualDiff, tmp_path: Path) -> None:
         baseline_img = Image.new("RGB", (100, 100), color=(255, 0, 0))
         current_img = Image.new("RGB", (200, 200), color=(255, 0, 0))
         baseline = tmp_path / "baseline.png"
@@ -105,9 +101,7 @@ class TestVisualDiff:
         assert result.matches is False
         assert result.size_mismatch is True
 
-    def test_missing_baseline_creates_new(
-        self, differ: VisualDiff, tmp_path: Path
-    ) -> None:
+    def test_missing_baseline_creates_new(self, differ: VisualDiff, tmp_path: Path) -> None:
         baseline = tmp_path / "nonexistent.png"
         current_img = Image.new("RGB", (100, 100), color=(255, 0, 0))
         current = tmp_path / "current.png"
