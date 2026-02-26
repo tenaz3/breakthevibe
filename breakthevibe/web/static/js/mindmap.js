@@ -105,7 +105,7 @@
             .join("path")
             .attr("class", "link")
             .attr("fill", "none")
-            .attr("stroke", "#4b5563")
+            .attr("stroke", getComputedStyle(document.documentElement).getPropertyValue('--border').trim())
             .attr("stroke-width", 1.5)
             .attr("d", d3.linkHorizontal().x((d) => d.y).y((d) => d.x));
 
@@ -119,26 +119,27 @@
 
         const typeColors = {
             component: "#22c55e",
-            interaction: "#f59e0b",
+            interaction: "#eab308",
             api_call: "#ef4444",
             screenshot: "#8b5cf6",
             video: "#ec4899",
             group_components: "#22c55e",
-            group_interactions: "#f59e0b",
+            group_interactions: "#eab308",
             group_api: "#ef4444",
             group_media: "#8b5cf6",
         };
 
         node.append("circle")
-            .attr("r", (d) => d.data.type && d.data.type.startsWith("group_") ? 6 : 5)
-            .attr("fill", (d) => typeColors[d.data.type] || "#6366f1");
+            .attr("r", (d) => d.data.type && d.data.type.startsWith("group_") ? 6 : 4)
+            .attr("fill", (d) => typeColors[d.data.type] || getComputedStyle(document.documentElement).getPropertyValue('--muted-foreground').trim());
 
         node.append("text")
             .attr("dy", "0.31em")
             .attr("x", (d) => (d.children ? -8 : 8))
             .attr("text-anchor", (d) => (d.children ? "end" : "start"))
-            .attr("fill", "#e4e4e7")
-            .attr("font-size", "12px")
+            .attr("fill", getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim())
+            .attr("font-size", "11px")
+            .attr("font-family", "'Inter', system-ui, sans-serif")
             .text((d) => d.data.name);
 
         // Pan & zoom

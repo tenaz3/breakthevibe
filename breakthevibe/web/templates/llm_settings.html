@@ -1,81 +1,161 @@
 {% extends "base.html" %}
 {% block title %}LLM Settings — BreakTheVibe{% endblock %}
 {% block content %}
-<div class="flex items-center gap-4 mb-6">
-    <h1 class="text-2xl font-bold">LLM Settings</h1>
+<script>
+var MODEL_OPTIONS = {
+    anthropic: [
+        { value: "claude-opus-4-20250514", label: "Claude Opus 4" },
+        { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+        { value: "claude-haiku-4-20250506", label: "Claude Haiku 4" },
+        { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
+        { value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku" },
+    ],
+    openai: [
+        { value: "gpt-4o", label: "GPT-4o" },
+        { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+        { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
+        { value: "o3-mini", label: "o3-mini" },
+        { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
+    ],
+    ollama: [
+        { value: "llama3.1", label: "Llama 3.1" },
+        { value: "llama3.2", label: "Llama 3.2" },
+        { value: "mistral", label: "Mistral" },
+        { value: "codellama", label: "Code Llama" },
+        { value: "deepseek-coder-v2", label: "DeepSeek Coder V2" },
+    ],
+};
+
+function populateModelSelect(modelSelect, provider, currentModel) {
+    var options = MODEL_OPTIONS[provider] || [];
+    while (modelSelect.firstChild) {
+        modelSelect.removeChild(modelSelect.firstChild);
+    }
+    options.forEach(function(opt) {
+        var el = document.createElement('option');
+        el.value = opt.value;
+        el.textContent = opt.label;
+        if (opt.value === currentModel) el.selected = true;
+        modelSelect.appendChild(el);
+    });
+    if (modelSelect.value !== currentModel && options.length > 0) {
+        modelSelect.selectedIndex = 0;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var defaultProvider = document.querySelector('[name="default_provider"]');
+    var defaultModel = document.querySelector('[name="default_model"]');
+
+    populateModelSelect(defaultModel, defaultProvider.value, defaultModel.dataset.current);
+    defaultProvider.addEventListener('change', function() {
+        populateModelSelect(defaultModel, defaultProvider.value, '');
+    });
+
+    ['mapper', 'generator', 'agent'].forEach(function(mod) {
+        var providerSel = document.querySelector('[name="modules_' + mod + '_provider"]');
+        var modelSel = document.querySelector('[name="modules_' + mod + '_model"]');
+        var savedModel = modelSel.dataset.current;
+
+        function getEffectiveProvider() {
+            return providerSel.value || defaultProvider.value;
+        }
+        function refreshModuleModels(keepModel) {
+            populateModelSelect(modelSel, getEffectiveProvider(), keepModel || '');
+        }
+
+        refreshModuleModels(savedModel);
+        providerSel.addEventListener('change', function() {
+            refreshModuleModels('');
+        });
+        defaultProvider.addEventListener('change', function() {
+            if (!providerSel.value) refreshModuleModels('');
+        });
+    });
+});
+</script>
+
+<div class="page-header mb-6">
+    <h1>LLM Settings</h1>
 </div>
 
 <form hx-put="/api/settings/llm" hx-swap="none"
-      hx-on::after-request="if(event.detail.successful){showToast('Settings saved successfully','success')}else{showToast('Failed to save settings')}"
-      enctype="application/x-www-form-urlencoded">
+      hx-on::after-request="if(event.detail.successful){showToast('Settings saved','success')}else{showToast('Failed to save settings')}"
+      enctype="application/x-www-form-urlencoded"
+      class="space-y-4 max-w-2xl">
 
-    <div class="bg-card border border-border rounded-lg p-5 mb-4">
-        <h3 class="text-lg font-semibold mb-4">Default Provider</h3>
-        <label class="block mb-4">
-            <span class="text-sm text-muted-foreground">Provider</span>
-            <select name="default_provider"
-                    class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-                <option value="anthropic" {% if settings.default_provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
-                <option value="openai" {% if settings.default_provider == 'openai' %}selected{% endif %}>OpenAI</option>
-                <option value="ollama" {% if settings.default_provider == 'ollama' %}selected{% endif %}>Ollama</option>
-            </select>
-        </label>
-        <label class="block">
-            <span class="text-sm text-muted-foreground">Model</span>
-            <input type="text" name="default_model" value="{{ settings.default_model }}"
-                   class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-        </label>
-    </div>
-
-    <div class="bg-card border border-border rounded-lg p-5 mb-4">
-        <h3 class="text-lg font-semibold mb-4">Per-Module Overrides</h3>
-        {% for module in ['mapper', 'generator', 'agent'] %}
-        <fieldset class="border border-border rounded-lg p-4 mb-3">
-            <legend class="text-sm text-muted-foreground px-2">{{ module | capitalize }}</legend>
-            <label class="block mb-3">
-                <span class="text-sm text-muted-foreground">Provider</span>
-                <select name="modules_{{ module }}_provider"
-                        class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-                    <option value="">Use default</option>
-                    <option value="anthropic" {% if settings.modules[module].provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
-                    <option value="openai" {% if settings.modules[module].provider == 'openai' %}selected{% endif %}>OpenAI</option>
-                    <option value="ollama" {% if settings.modules[module].provider == 'ollama' %}selected{% endif %}>Ollama</option>
+    <!-- Default Provider -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Default Provider</h3>
+        </div>
+        <div class="card-content space-y-4">
+            <div>
+                <label for="default-provider" class="label">Provider</label>
+                <select id="default-provider" name="default_provider" class="select">
+                    <option value="anthropic" {% if settings.default_provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
+                    <option value="openai" {% if settings.default_provider == 'openai' %}selected{% endif %}>OpenAI</option>
+                    <option value="ollama" {% if settings.default_provider == 'ollama' %}selected{% endif %}>Ollama</option>
                 </select>
-            </label>
-            <label class="block">
-                <span class="text-sm text-muted-foreground">Model</span>
-                <input type="text" name="modules_{{ module }}_model" value="{{ settings.modules[module].model }}"
-                       class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-            </label>
-        </fieldset>
-        {% endfor %}
+            </div>
+            <div>
+                <label for="default-model" class="label">Model</label>
+                <select id="default-model" name="default_model" data-current="{{ settings.default_model }}" class="select"></select>
+            </div>
+        </div>
     </div>
 
-    <div class="bg-card border border-border rounded-lg p-5 mb-4">
-        <h3 class="text-lg font-semibold mb-4">API Keys</h3>
-        <p class="text-sm text-muted-foreground mb-4">In production, use environment variables (ANTHROPIC_API_KEY, OPENAI_API_KEY).</p>
-        <label class="block mb-4">
-            <span class="text-sm text-muted-foreground">Anthropic API Key</span>
-            <input type="password" name="anthropic_api_key" placeholder="sk-ant-..."
-                   class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-        </label>
-        <label class="block mb-4">
-            <span class="text-sm text-muted-foreground">OpenAI API Key</span>
-            <input type="password" name="openai_api_key" placeholder="sk-..."
-                   class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-        </label>
-        <label class="block">
-            <span class="text-sm text-muted-foreground">Ollama Base URL</span>
-            <input type="text" name="ollama_base_url" value="{{ settings.providers.ollama.base_url }}"
-                   class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-        </label>
+    <!-- Per-Module Overrides -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Per-Module Overrides</h3>
+        </div>
+        <div class="card-content space-y-3">
+            {% for module in ['mapper', 'generator', 'agent'] %}
+            <fieldset class="field-group">
+                <legend>{{ module | capitalize }}</legend>
+                <div class="space-y-3 mt-2">
+                    <div>
+                        <label class="label label-muted">Provider</label>
+                        <select name="modules_{{ module }}_provider" class="select">
+                            <option value="">Use default</option>
+                            <option value="anthropic" {% if settings.modules[module].provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
+                            <option value="openai" {% if settings.modules[module].provider == 'openai' %}selected{% endif %}>OpenAI</option>
+                            <option value="ollama" {% if settings.modules[module].provider == 'ollama' %}selected{% endif %}>Ollama</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label label-muted">Model</label>
+                        <select name="modules_{{ module }}_model" data-current="{{ settings.modules[module].model }}" class="select"></select>
+                    </div>
+                </div>
+            </fieldset>
+            {% endfor %}
+        </div>
     </div>
 
-    <div class="flex gap-3">
-        <button type="submit"
-                class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors">
-            Save Settings
-        </button>
+    <!-- API Keys -->
+    <div class="card">
+        <div class="card-header">
+            <h3>API Keys</h3>
+        </div>
+        <div class="card-content space-y-4">
+            <p class="text-[0.8125rem] text-muted-foreground">In production, use environment variables (<span class="font-mono text-[0.75rem]">ANTHROPIC_API_KEY</span>, <span class="font-mono text-[0.75rem]">OPENAI_API_KEY</span>).</p>
+            <div>
+                <label class="label">Anthropic API Key</label>
+                <input type="password" name="anthropic_api_key" placeholder="sk-ant-..." class="input">
+            </div>
+            <div>
+                <label class="label">OpenAI API Key</label>
+                <input type="password" name="openai_api_key" placeholder="sk-..." class="input">
+            </div>
+            <div>
+                <label class="label">Ollama Base URL</label>
+                <input type="text" name="ollama_base_url" value="{{ settings.providers.ollama.base_url }}" class="input">
+            </div>
+        </div>
     </div>
+
+    <button type="submit" class="btn btn-primary">Save Settings</button>
 </form>
 {% endblock %}

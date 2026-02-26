@@ -1,10 +1,27 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}BreakTheVibe{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+
+    <!-- Theme init (prevent flash) -->
+    <script>
+        (function() {
+            var stored = localStorage.getItem('btv-theme');
+            if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -12,83 +29,156 @@
             theme: {
                 extend: {
                     colors: {
-                        background: '#0f1117',
-                        foreground: '#e4e4e7',
-                        card: '#1a1d27',
-                        'card-foreground': '#e4e4e7',
-                        border: '#2a2d3a',
-                        input: '#2a2d3a',
-                        ring: '#6366f1',
-                        primary: { DEFAULT: '#6366f1', foreground: '#ffffff', hover: '#818cf8' },
-                        secondary: { DEFAULT: '#2a2d3a', foreground: '#e4e4e7' },
-                        destructive: { DEFAULT: '#ef4444', foreground: '#ffffff', hover: '#f87171' },
-                        muted: { DEFAULT: '#2a2d3a', foreground: '#71717a' },
-                        accent: { DEFAULT: '#2a2d3a', foreground: '#e4e4e7' },
-                        success: '#22c55e',
-                        warning: '#f59e0b',
+                        background: 'var(--background)',
+                        foreground: 'var(--foreground)',
+                        card: { DEFAULT: 'var(--card)', foreground: 'var(--card-foreground)' },
+                        popover: { DEFAULT: 'var(--popover)', foreground: 'var(--popover-foreground)' },
+                        primary: { DEFAULT: 'var(--primary)', foreground: 'var(--primary-foreground)' },
+                        secondary: { DEFAULT: 'var(--secondary)', foreground: 'var(--secondary-foreground)' },
+                        muted: { DEFAULT: 'var(--muted)', foreground: 'var(--muted-foreground)' },
+                        accent: { DEFAULT: 'var(--accent)', foreground: 'var(--accent-foreground)' },
+                        destructive: { DEFAULT: 'var(--destructive)', foreground: 'var(--destructive-foreground)' },
+                        border: 'var(--border)',
+                        input: 'var(--input)',
+                        ring: 'var(--ring)',
+                        success: 'var(--success)',
+                        warning: 'var(--warning)',
                     },
-                    borderRadius: { lg: '0.5rem', md: '0.375rem', sm: '0.25rem' },
+                    borderRadius: {
+                        lg: 'var(--radius)',
+                        md: 'calc(var(--radius) - 2px)',
+                        sm: 'calc(var(--radius) - 4px)',
+                    },
                     fontFamily: {
-                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-                        mono: ['SF Mono', 'Fira Code', 'monospace'],
+                        sans: ['"Inter"', 'system-ui', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
                     },
                 }
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/css/style.css">
+
+    <link rel="stylesheet" href="/static/css/style.css?v=2">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx-ext-json-enc@2.0.1/json-enc.js"></script>
     {% block head %}{% endblock %}
 </head>
-<body class="bg-background text-foreground min-h-screen antialiased">
-    <nav class="bg-card border-b border-border py-3">
-        <div class="max-w-7xl mx-auto px-6 flex items-center justify-between">
-            <a href="/" class="text-primary font-bold text-xl hover:text-primary-hover transition-colors">BreakTheVibe</a>
-            <div class="flex gap-6">
-                <a href="/" class="text-muted-foreground text-sm hover:text-foreground transition-colors">Projects</a>
-                <a href="/settings/llm" class="text-muted-foreground text-sm hover:text-foreground transition-colors">LLM Settings</a>
+<body class="bg-background text-foreground min-h-screen antialiased font-sans">
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
+        <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+            <a href="/" class="font-bold text-[0.9375rem] tracking-tight text-foreground hover:opacity-70 transition-opacity">
+                BreakTheVibe
+            </a>
+            <div class="flex items-center gap-1">
+                <a href="/" class="px-3 py-1.5 text-[0.8125rem] text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-all">
+                    Projects
+                </a>
+                <a href="/settings/llm" class="px-3 py-1.5 text-[0.8125rem] text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-all">
+                    Settings
+                </a>
+                <div class="w-px h-4 bg-border mx-1"></div>
+                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+                    <!-- Sun icon (visible in dark mode) -->
+                    <svg class="theme-icon-sun" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="5"/>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                    </svg>
+                    <!-- Moon icon (visible in light mode) -->
+                    <svg class="theme-icon-moon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
             </div>
         </div>
     </nav>
-    <main class="max-w-7xl mx-auto px-6 py-6">
+
+    <main class="max-w-6xl mx-auto px-6 py-8 animate-fade-in">
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Toast notification container -->
-    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Confirmation dialog -->
+    <div id="confirm-dialog" class="hidden">
+        <div class="dialog-overlay" onclick="closeConfirmDialog()"></div>
+        <div class="dialog">
+            <div class="dialog-content">
+                <h3 id="confirm-title" class="dialog-title">Are you sure?</h3>
+                <p id="confirm-message" class="dialog-description"></p>
+                <div class="dialog-actions">
+                    <button onclick="closeConfirmDialog()" class="btn btn-secondary">Cancel</button>
+                    <button id="confirm-action" class="btn btn-destructive">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        function showToast(message, type) {
-            type = type || 'error';
-            var container = document.getElementById('toast-container');
-            var toast = document.createElement('div');
-            var colorMap = {
-                error: 'bg-destructive text-white border-destructive',
-                success: 'bg-emerald-900/90 text-emerald-100 border-emerald-700',
-                info: 'bg-card text-foreground border-border',
-            };
-            toast.className = 'flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg backdrop-blur-sm transition-all duration-300 translate-x-full ' + (colorMap[type] || colorMap.info);
+    /* ── Theme Toggle ────────────────────────────────────────── */
+    document.getElementById('theme-toggle').addEventListener('click', function() {
+        var html = document.documentElement;
+        html.classList.toggle('dark');
+        localStorage.setItem('btv-theme', html.classList.contains('dark') ? 'dark' : 'light');
+    });
 
-            var span = document.createElement('span');
-            span.className = 'text-sm font-medium';
-            span.textContent = message;
-            toast.appendChild(span);
+    /* ── Toast ───────────────────────────────────────────────── */
+    function showToast(message, type) {
+        type = type || 'error';
+        var container = document.getElementById('toast-container');
+        var toast = document.createElement('div');
+        var cls = {
+            error: 'toast toast-error',
+            success: 'toast toast-success',
+            info: 'toast toast-info',
+        };
+        toast.className = (cls[type] || cls.info) + ' translate-y-2 opacity-0';
 
-            var closeBtn = document.createElement('button');
-            closeBtn.className = 'ml-2 opacity-70 hover:opacity-100 transition-opacity text-current';
-            closeBtn.textContent = '\u00d7';
-            closeBtn.style.fontSize = '1.25rem';
-            closeBtn.style.lineHeight = '1';
-            closeBtn.addEventListener('click', function() { toast.remove(); });
-            toast.appendChild(closeBtn);
+        var span = document.createElement('span');
+        span.textContent = message;
+        toast.appendChild(span);
 
-            container.appendChild(toast);
-            requestAnimationFrame(function() { toast.classList.remove('translate-x-full'); });
-            setTimeout(function() {
-                toast.classList.add('translate-x-full', 'opacity-0');
-                setTimeout(function() { toast.remove(); }, 300);
-            }, 5000);
-        }
+        var close = document.createElement('button');
+        close.className = 'ml-auto opacity-50 hover:opacity-100 transition-opacity cursor-pointer';
+        close.textContent = '\u00d7';
+        close.style.fontSize = '1rem';
+        close.style.lineHeight = '1';
+        close.addEventListener('click', function() { dismissToast(toast); });
+        toast.appendChild(close);
+
+        container.appendChild(toast);
+        requestAnimationFrame(function() {
+            toast.classList.remove('translate-y-2', 'opacity-0');
+        });
+        setTimeout(function() { dismissToast(toast); }, 4000);
+    }
+
+    function dismissToast(toast) {
+        toast.classList.add('translate-y-2', 'opacity-0');
+        setTimeout(function() { toast.remove(); }, 300);
+    }
+
+    /* ── Confirmation Dialog ─────────────────────────────────── */
+    var confirmCallback = null;
+
+    function openConfirmDialog(title, message, actionLabel, callback) {
+        document.getElementById('confirm-title').textContent = title;
+        document.getElementById('confirm-message').textContent = message;
+        document.getElementById('confirm-action').textContent = actionLabel;
+        confirmCallback = callback;
+        document.getElementById('confirm-dialog').classList.remove('hidden');
+    }
+
+    function closeConfirmDialog() {
+        document.getElementById('confirm-dialog').classList.add('hidden');
+        confirmCallback = null;
+    }
+
+    document.getElementById('confirm-action').addEventListener('click', function() {
+        if (confirmCallback) confirmCallback();
+        closeConfirmDialog();
+    });
     </script>
     {% block scripts %}{% endblock %}
 </body>

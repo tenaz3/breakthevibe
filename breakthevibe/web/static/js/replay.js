@@ -43,7 +43,7 @@
             if (step.description) {
                 const desc = document.createElement("span");
                 desc.textContent = " — " + step.description;
-                desc.className = "text-muted";
+                desc.className = "text-muted-foreground";
                 stepInfo.appendChild(desc);
             }
         }
@@ -60,7 +60,7 @@
             const requests = step.network_requests || [];
             requests.forEach(function (req) {
                 const entry = document.createElement("div");
-                entry.className = "text-muted";
+                entry.className = "text-muted-foreground";
                 const method = document.createElement("strong");
                 method.textContent = req.method || "GET";
                 entry.appendChild(method);

@@ -1,73 +1,106 @@
 {% extends "base.html" %}
 {% block title %}Projects — BreakTheVibe{% endblock %}
 {% block content %}
-<div class="flex items-center gap-4 mb-6">
-    <h1 class="text-2xl font-bold">Projects</h1>
-    <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors"
-            onclick="document.getElementById('new-project-form').classList.remove('hidden')">
-        + New Project
+<div class="flex items-center justify-between mb-6">
+    <h1>Projects</h1>
+    <button class="btn btn-primary"
+            onclick="document.getElementById('new-project-form').classList.toggle('hidden')">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+        New Project
     </button>
 </div>
 
-<div id="new-project-form" class="hidden bg-card border border-border rounded-lg p-5 mb-6"
-     hx-ext="json-enc">
-    <h3 class="text-lg font-semibold mb-4">Create Project</h3>
+<!-- Create project form -->
+<div id="new-project-form" class="hidden card card-content mb-6 animate-in" hx-ext="json-enc">
+    <h3 class="mb-4">Create Project</h3>
     <form id="create-project-form"
           hx-post="/api/projects" hx-target="#project-grid" hx-swap="beforeend"
-          hx-on::after-request="if(event.detail.successful){this.reset();document.getElementById('new-project-form').classList.add('hidden');showToast('Project created successfully','success');setTimeout(function(){location.reload()},800)}else{var msg='Failed to create project';try{var d=JSON.parse(event.detail.xhr.responseText);if(d.detail)msg=d.detail}catch(e){}showToast(msg)}">
-        <label class="block mb-4">
-            <span class="text-sm text-muted-foreground">Name</span>
-            <input type="text" name="name" required minlength="1"
-                   class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-        </label>
-        <label class="block mb-4">
-            <span class="text-sm text-muted-foreground">URL</span>
-            <input type="url" name="url" required placeholder="https://example.com"
-                   class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-        </label>
-        <div class="flex gap-3">
-            <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors">
-                Create
-            </button>
-            <button type="button"
-                    class="inline-flex items-center px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium border border-border hover:bg-accent transition-colors"
-                    onclick="document.getElementById('new-project-form').classList.add('hidden')">
-                Cancel
-            </button>
+          hx-on::after-request="if(event.detail.successful){this.reset();document.getElementById('new-project-form').classList.add('hidden');showToast('Project created','success');setTimeout(function(){location.reload()},800)}else{var msg='Failed to create project';try{var d=JSON.parse(event.detail.xhr.responseText);if(d.detail)msg=d.detail}catch(e){}showToast(msg)}">
+        <div class="space-y-4">
+            <div>
+                <label for="project-name" class="label">Name</label>
+                <input type="text" id="project-name" name="name" required minlength="1" class="input" placeholder="My Website">
+            </div>
+            <div>
+                <label for="project-url" class="label">URL</label>
+                <input type="url" id="project-url" name="url" required class="input" placeholder="https://example.com">
+            </div>
+            <div class="flex gap-3 pt-1">
+                <button type="submit" class="btn btn-primary">Create</button>
+                <button type="button" class="btn btn-secondary"
+                        onclick="document.getElementById('new-project-form').classList.add('hidden')">
+                    Cancel
+                </button>
+            </div>
         </div>
     </form>
 </div>
 
-<div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+<!-- Project grid -->
+<div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 stagger-children">
     {% for project in projects %}
-    <div class="bg-card border border-border rounded-lg p-5 hover:border-primary/50 transition-colors" id="project-{{ project.id }}">
-        <h3 class="font-semibold text-foreground mb-1">{{ project.name }}</h3>
-        <p class="text-sm text-muted-foreground mb-3">{{ project.url }}</p>
-        <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase
-            {% if project.status == 'passed' or project.status == 'healthy' %}bg-emerald-900/50 text-emerald-300
-            {% elif project.status == 'failed' %}bg-red-900/50 text-red-300
-            {% elif project.status == 'running' %}bg-blue-900/50 text-blue-300
-            {% else %}bg-muted text-muted-foreground{% endif %}">
-            {{ project.status }}
-        </span>
-        <div class="flex gap-2 mt-4">
-            <a href="/projects/{{ project.id }}"
-               class="inline-flex items-center px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border hover:bg-accent transition-colors">
-                View
-            </a>
-            <button class="inline-flex items-center px-3 py-1.5 rounded-md bg-destructive text-white text-xs font-medium hover:bg-destructive-hover transition-colors"
-                    hx-delete="/api/projects/{{ project.id }}"
-                    hx-target="#project-{{ project.id }}"
-                    hx-swap="outerHTML"
-                    hx-confirm="Delete this project?"
-                    hx-on::after-request="if(event.detail.successful){showToast('Project deleted','success')}else{showToast('Failed to delete project')}">
+    <div class="card card-interactive card-content" id="project-{{ project.id }}">
+        <div class="flex items-start justify-between gap-3 mb-3">
+            <div class="min-w-0">
+                <h3 class="text-[0.9375rem] font-semibold text-foreground truncate">{{ project.name }}</h3>
+                <p class="text-[0.8125rem] text-muted-foreground truncate mt-0.5">{{ project.url }}</p>
+            </div>
+            <span class="badge shrink-0
+                {% if project.status == 'passed' or project.status == 'healthy' %}badge-success
+                {% elif project.status == 'failed' %}badge-destructive
+                {% elif project.status == 'running' %}badge-info
+                {% else %}badge-secondary{% endif %}">
+                {{ project.status }}
+            </span>
+        </div>
+        <div class="flex gap-2 pt-2 border-t border-border">
+            <a href="/projects/{{ project.id }}" class="btn btn-secondary btn-sm">View</a>
+            <button class="btn btn-ghost btn-sm text-muted-foreground hover:text-destructive"
+                    onclick="deleteProject('{{ project.id }}', '{{ project.name }}')">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
                 Delete
             </button>
         </div>
     </div>
     {% endfor %}
     {% if not projects %}
-    <p class="text-sm text-muted-foreground col-span-full">No projects yet. Create one to get started.</p>
+    <div class="col-span-full card">
+        <div class="empty-state">
+            <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"/></svg>
+            <p>No projects yet</p>
+            <p>Create one to get started.</p>
+        </div>
+    </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function deleteProject(id, name) {
+    openConfirmDialog(
+        'Delete project',
+        'This will permanently delete "' + name + '" and all its data. This action cannot be undone.',
+        'Delete',
+        function() {
+            fetch('/api/projects/' + id, { method: 'DELETE' })
+                .then(function(res) {
+                    if (res.ok) {
+                        var el = document.getElementById('project-' + id);
+                        if (el) {
+                            el.style.transition = 'opacity 0.2s, transform 0.2s';
+                            el.style.opacity = '0';
+                            el.style.transform = 'scale(0.95)';
+                            setTimeout(function() { el.remove(); }, 200);
+                        }
+                        showToast('Project deleted', 'success');
+                    } else {
+                        showToast('Failed to delete project');
+                    }
+                })
+                .catch(function() { showToast('Failed to delete project'); });
+        }
+    );
+}
+</script>
 {% endblock %}

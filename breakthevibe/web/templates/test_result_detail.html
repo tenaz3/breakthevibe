@@ -1,133 +1,139 @@
 {% extends "base.html" %}
 {% block title %}Test Result — BreakTheVibe{% endblock %}
 {% block content %}
-
 <!-- Back link -->
-<a href="javascript:history.back()"
-   class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-5">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
-    </svg>
-    Back to Project
+<a href="javascript:history.back()" class="back-link">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    Back
 </a>
 
 <!-- Header -->
-<div class="flex items-center gap-3 mb-6">
-    <h1 class="text-2xl font-bold text-foreground">Test Run: {{ run_id[:8] if run_id else 'N/A' }}</h1>
-    <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase
-        {% if status == 'passed' %}bg-emerald-900/50 text-emerald-300
-        {% elif status == 'failed' %}bg-red-900/50 text-red-300
-        {% elif status == 'running' %}bg-blue-900/50 text-blue-300
-        {% else %}bg-muted text-muted-foreground{% endif %}">
+<div class="page-header">
+    <h1>Test Run: {{ run_id[:8] if run_id else 'N/A' }}</h1>
+    <span class="badge
+        {% if status == 'passed' %}badge-success
+        {% elif status == 'failed' %}badge-destructive
+        {% elif status == 'running' %}badge-info
+        {% else %}badge-secondary{% endif %}">
         {{ status }}
     </span>
 </div>
+<div class="mb-6"></div>
 
-<!-- Error banner (shown when pipeline fails with an error) -->
+<!-- Error banner -->
 {% if result and result.error_message %}
-<div class="bg-red-900/30 border border-red-700/50 rounded-lg p-4 mb-6">
-    <div class="flex items-start gap-3">
-        <svg class="w-5 h-5 text-red-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
-        </svg>
-        <div>
-            <h3 class="text-sm font-semibold text-red-300">
-                Pipeline failed{% if result.failed_stage %} at stage: <span class="font-mono">{{ result.failed_stage }}</span>{% endif %}
-            </h3>
-            <p class="text-sm text-red-300/80 mt-1">{{ result.error_message }}</p>
-        </div>
+<div class="callout callout-destructive mb-6">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+    </svg>
+    <div>
+        <p class="font-semibold text-[0.8125rem]">
+            Pipeline failed{% if result.failed_stage %} at stage: <span class="font-mono">{{ result.failed_stage }}</span>{% endif %}
+        </p>
+        <p class="text-[0.8125rem] opacity-80 mt-1">{{ result.error_message }}</p>
     </div>
 </div>
 {% endif %}
 
-<!-- Stats bar -->
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-    <div class="bg-card border border-border rounded-lg p-4 text-center">
-        <div class="text-2xl font-bold text-foreground">{{ total }}</div>
-        <div class="text-xs text-muted-foreground mt-1">Total</div>
+<!-- Stats -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div class="stat-card">
+        <div class="stat-value">{{ total }}</div>
+        <div class="stat-label">Total</div>
     </div>
-    <div class="bg-card border border-border rounded-lg p-4 text-center">
-        <div class="text-2xl font-bold text-success">{{ passed }}</div>
-        <div class="text-xs text-muted-foreground mt-1">Passed</div>
+    <div class="stat-card">
+        <div class="stat-value text-success">{{ passed }}</div>
+        <div class="stat-label">Passed</div>
     </div>
-    <div class="bg-card border border-border rounded-lg p-4 text-center">
-        <div class="text-2xl font-bold text-destructive">{{ failed }}</div>
-        <div class="text-xs text-muted-foreground mt-1">Failed</div>
+    <div class="stat-card">
+        <div class="stat-value text-destructive">{{ failed }}</div>
+        <div class="stat-label">Failed</div>
     </div>
-    <div class="bg-card border border-border rounded-lg p-4 text-center">
-        <div class="text-2xl font-bold text-foreground">{{ duration }}</div>
-        <div class="text-xs text-muted-foreground mt-1">Duration</div>
+    <div class="stat-card">
+        <div class="stat-value">{{ duration }}</div>
+        <div class="stat-label">Duration</div>
     </div>
 </div>
 
-<!-- Healed selectors warning -->
+<!-- Healed selectors -->
 {% if heal_warnings %}
-<div class="bg-card border border-warning/50 rounded-lg p-5 mb-6">
-    <h3 class="text-sm font-semibold text-warning mb-3">Healed Selectors</h3>
-    <ul class="space-y-1.5">
-        {% for warning in heal_warnings %}
-        <li class="text-sm text-muted-foreground">{{ warning }}</li>
-        {% endfor %}
-    </ul>
+<div class="callout callout-warning mb-6">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+    </svg>
+    <div>
+        <p class="font-semibold text-[0.8125rem] mb-2">Healed Selectors</p>
+        <ul class="space-y-1">
+            {% for warning in heal_warnings %}
+            <li class="text-[0.8125rem] opacity-80">{{ warning }}</li>
+            {% endfor %}
+        </ul>
+    </div>
 </div>
 {% endif %}
 
 <!-- Test suites -->
 {% if suites %}
-<div class="space-y-2 mb-6">
+<h2 class="mb-3">Test Suites</h2>
+<div class="space-y-2 mb-6 stagger-children">
     {% for suite in suites %}
-    <details class="bg-card border border-border rounded-lg">
-        <summary class="cursor-pointer flex items-center justify-between px-5 py-3">
-            <strong class="text-sm font-semibold text-foreground">{{ suite.name }}</strong>
-            <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase
-                {% if suite.success %}bg-emerald-900/50 text-emerald-300{% else %}bg-red-900/50 text-red-300{% endif %}">
+    <details class="accordion">
+        <summary>
+            <span class="text-foreground">{{ suite.name }}</span>
+            <span class="badge {% if suite.success %}badge-success{% else %}badge-destructive{% endif %}">
                 {{ 'PASS' if suite.success else 'FAIL' }}
             </span>
         </summary>
-        <pre class="px-5 pb-4 pt-2 text-xs font-mono overflow-x-auto text-muted-foreground whitespace-pre-wrap">{{ suite.stdout }}</pre>
+        <pre class="accordion-content text-[0.75rem] font-mono text-muted-foreground whitespace-pre-wrap overflow-x-auto">{{ suite.stdout }}</pre>
     </details>
     {% endfor %}
 </div>
 {% elif not (result and result.error_message) %}
-<!-- Empty state: no suites AND no error -->
-<div class="bg-card border border-border rounded-lg p-8 mb-6 text-center">
-    <svg class="w-10 h-10 text-muted-foreground mx-auto mb-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
-    </svg>
-    <p class="text-sm text-muted-foreground">No test data available</p>
+<div class="card mb-6">
+    <div class="empty-state">
+        <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+        </svg>
+        <p>No test data available</p>
+        <p>Run the pipeline to generate results.</p>
+    </div>
 </div>
 {% endif %}
 
-<!-- Step Replay panel -->
-<div class="bg-card border border-border rounded-lg p-5 mb-6" id="replay-panel">
-    <h3 class="text-sm font-semibold text-foreground mb-3">Step Replay</h3>
-    <div class="flex items-center gap-3 mb-3">
-        <button class="inline-flex items-center px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border hover:bg-accent transition-colors" id="replay-prev">Previous</button>
-        <span id="replay-counter" class="text-xs text-muted-foreground">0 / 0</span>
-        <button class="inline-flex items-center px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border hover:bg-accent transition-colors" id="replay-next">Next</button>
+<!-- Step Replay -->
+<div class="card mb-6" id="replay-panel">
+    <div class="card-header">
+        <h3>Step Replay</h3>
     </div>
-    <div id="replay-step-info" class="text-sm text-foreground"></div>
-    <img id="replay-screenshot" class="w-full rounded-md mt-3 hidden" src="" alt="Step screenshot">
-    <div id="replay-network" class="mt-2 text-xs text-muted-foreground"></div>
-    <pre id="replay-console" class="mt-2 text-xs font-mono text-muted-foreground hidden whitespace-pre-wrap"></pre>
+    <div class="card-content">
+        <div class="replay-controls mb-3">
+            <button class="btn btn-secondary btn-sm" id="replay-prev">Previous</button>
+            <span id="replay-counter" class="text-[0.75rem] text-muted-foreground tabular-nums">0 / 0</span>
+            <button class="btn btn-secondary btn-sm" id="replay-next">Next</button>
+        </div>
+        <div id="replay-step-info" class="text-[0.8125rem] text-foreground"></div>
+        <img id="replay-screenshot" class="replay-screenshot mt-3 hidden" src="" alt="Step screenshot">
+        <div id="replay-network" class="mt-2 text-[0.75rem] text-muted-foreground"></div>
+        <pre id="replay-console" class="code-block mt-2 text-[0.75rem] hidden"></pre>
+    </div>
 </div>
 
 <!-- Visual diffs -->
 {% if diffs %}
-<h3 class="text-lg font-semibold text-foreground mt-6 mb-3">Visual Diffs</h3>
+<h2 class="mb-3">Visual Diffs</h2>
 {% for diff in diffs %}
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+<div class="diff-grid mb-4">
     <div>
-        <p class="text-xs text-muted-foreground mb-1.5">Baseline</p>
-        <img src="{{ diff.baseline }}" alt="Baseline" class="w-full rounded-md border border-border">
+        <p class="text-[0.75rem] text-muted-foreground mb-1.5">Baseline</p>
+        <img src="{{ diff.baseline }}" alt="Baseline">
     </div>
     <div>
-        <p class="text-xs text-muted-foreground mb-1.5">Current</p>
-        <img src="{{ diff.current }}" alt="Current" class="w-full rounded-md border border-border">
+        <p class="text-[0.75rem] text-muted-foreground mb-1.5">Current</p>
+        <img src="{{ diff.current }}" alt="Current">
     </div>
     <div>
-        <p class="text-xs text-muted-foreground mb-1.5">Diff</p>
-        <img src="{{ diff.diff }}" alt="Diff" class="w-full rounded-md border border-border">
+        <p class="text-[0.75rem] text-muted-foreground mb-1.5">Diff</p>
+        <img src="{{ diff.diff }}" alt="Diff">
     </div>
 </div>
 {% endfor %}
@@ -135,7 +141,7 @@
 
 <!-- Video recording -->
 {% if video_url %}
-<h3 class="text-lg font-semibold text-foreground mt-6 mb-3">Recording</h3>
+<h2 class="mb-3">Recording</h2>
 <video controls class="w-full rounded-lg border border-border">
     <source src="{{ video_url }}" type="video/webm">
 </video>

@@ -5,7 +5,7 @@ setup:
 	playwright install chromium
 
 dev:
-	fastapi dev breakthevibe/main.py
+	uv run uvicorn breakthevibe.web.app:create_app --factory --reload
 
 test:
 	pytest -v

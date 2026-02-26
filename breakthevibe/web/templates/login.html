@@ -1,9 +1,25 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login — BreakTheVibe</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+
+    <!-- Theme init (prevent flash) -->
+    <script>
+        (function() {
+            var stored = localStorage.getItem('btv-theme');
+            if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -11,74 +27,127 @@
             theme: {
                 extend: {
                     colors: {
-                        background: '#0f1117',
-                        foreground: '#e4e4e7',
-                        card: '#1a1d27',
-                        border: '#2a2d3a',
-                        ring: '#6366f1',
-                        primary: { DEFAULT: '#6366f1', foreground: '#ffffff', hover: '#818cf8' },
-                        muted: { foreground: '#71717a' },
-                        destructive: { DEFAULT: '#ef4444' },
+                        background: 'var(--background)',
+                        foreground: 'var(--foreground)',
+                        card: { DEFAULT: 'var(--card)', foreground: 'var(--card-foreground)' },
+                        primary: { DEFAULT: 'var(--primary)', foreground: 'var(--primary-foreground)' },
+                        secondary: { DEFAULT: 'var(--secondary)', foreground: 'var(--secondary-foreground)' },
+                        muted: { DEFAULT: 'var(--muted)', foreground: 'var(--muted-foreground)' },
+                        destructive: { DEFAULT: 'var(--destructive)', foreground: 'var(--destructive-foreground)' },
+                        border: 'var(--border)',
+                        input: 'var(--input)',
+                        ring: 'var(--ring)',
+                    },
+                    borderRadius: {
+                        lg: 'var(--radius)',
+                        md: 'calc(var(--radius) - 2px)',
+                        sm: 'calc(var(--radius) - 4px)',
+                    },
+                    fontFamily: {
+                        sans: ['"Inter"', 'system-ui', 'sans-serif'],
                     },
                 }
             }
         }
     </script>
+    <link rel="stylesheet" href="/static/css/style.css?v=2">
+    <style>
+        @keyframes slide-up {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-up { animation: slide-up 0.4s ease-out; }
+    </style>
 </head>
-<body class="bg-background text-foreground min-h-screen flex items-center justify-center antialiased">
-    <div class="bg-card border border-border rounded-lg p-8 w-full max-w-sm shadow-xl">
-        <h1 class="text-primary font-bold text-2xl mb-1">BreakTheVibe</h1>
-        <p class="text-muted-foreground text-sm mb-6">Sign in to continue</p>
-        <p id="login-error" class="hidden text-destructive text-sm mb-4 bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2"></p>
-        <form id="login-form" class="space-y-4">
-            <label class="block">
-                <span class="text-sm text-muted-foreground">Username</span>
-                <input type="text" name="username" required autocomplete="username"
-                       class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-            </label>
-            <label class="block">
-                <span class="text-sm text-muted-foreground">Password</span>
-                <input type="password" name="password" required autocomplete="current-password"
-                       class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-            </label>
-            <button type="submit"
-                    class="w-full flex justify-center items-center px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors">
-                Sign in
-            </button>
-        </form>
+<body class="bg-background text-foreground min-h-screen flex items-center justify-center antialiased font-sans px-4">
+    <!-- Subtle background grain -->
+    <div class="fixed inset-0 opacity-[0.015]" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E');"></div>
+
+    <!-- Theme toggle (top-right corner) -->
+    <button id="theme-toggle" class="theme-toggle fixed top-4 right-4 z-10" aria-label="Toggle theme">
+        <svg class="theme-icon-sun" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5"/>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+        <svg class="theme-icon-moon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+    </button>
+
+    <div class="w-full max-w-[22rem] relative animate-slide-up">
+        <!-- Brand -->
+        <div class="mb-8 text-center">
+            <h1 class="text-lg font-bold tracking-tight text-foreground">BreakTheVibe</h1>
+            <p class="text-[0.8125rem] text-muted-foreground mt-1">Sign in to your account</p>
+        </div>
+
+        <!-- Login card -->
+        <div class="bg-card border border-border rounded-lg p-6">
+            <!-- Error message -->
+            <div id="login-error" class="hidden mb-4 px-3 py-2.5 rounded-lg text-[0.8125rem]"
+                 style="background: var(--callout-destructive-bg); border: 1px solid var(--callout-destructive-border); color: var(--callout-destructive-text);"></div>
+
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="username" class="block text-[0.8125rem] font-medium text-foreground mb-1.5">Username</label>
+                    <input type="text" id="username" name="username" required autocomplete="username"
+                           class="input">
+                </div>
+                <div>
+                    <label for="password" class="block text-[0.8125rem] font-medium text-foreground mb-1.5">Password</label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password"
+                           class="input">
+                </div>
+                <button type="submit"
+                        class="w-full flex justify-center items-center px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-[0.8125rem] font-medium hover:opacity-90 transition-opacity mt-2">
+                    Sign in
+                </button>
+            </form>
+        </div>
+
+        <p class="text-center text-[0.75rem] text-muted-foreground/50 mt-6">AI-powered QA automation</p>
     </div>
+
     <script>
-        document.getElementById('login-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            var form = e.target;
-            var errEl = document.getElementById('login-error');
-            errEl.classList.add('hidden');
+    /* Theme toggle */
+    document.getElementById('theme-toggle').addEventListener('click', function() {
+        var html = document.documentElement;
+        html.classList.toggle('dark');
+        localStorage.setItem('btv-theme', html.classList.contains('dark') ? 'dark' : 'light');
+    });
 
-            var body = {
-                username: form.username.value,
-                password: form.password.value,
-            };
+    /* Login form */
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        var form = e.target;
+        var errEl = document.getElementById('login-error');
+        errEl.classList.add('hidden');
 
-            try {
-                var res = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body),
-                });
+        var body = {
+            username: form.username.value,
+            password: form.password.value,
+        };
 
-                if (res.ok) {
-                    var next = new URLSearchParams(window.location.search).get('next') || '/';
-                    window.location.href = next;
-                } else {
-                    var data = await res.json();
-                    errEl.textContent = data.detail || 'Login failed';
-                    errEl.classList.remove('hidden');
-                }
-            } catch(err) {
-                errEl.textContent = 'Network error. Please try again.';
+        try {
+            var res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+
+            if (res.ok) {
+                var next = new URLSearchParams(window.location.search).get('next') || '/';
+                window.location.href = next;
+            } else {
+                var data = await res.json();
+                errEl.textContent = data.detail || 'Login failed';
                 errEl.classList.remove('hidden');
             }
-        });
+        } catch(err) {
+            errEl.textContent = 'Network error. Please try again.';
+            errEl.classList.remove('hidden');
+        }
+    });
     </script>
 </body>
 </html>

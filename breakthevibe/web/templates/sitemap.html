@@ -4,16 +4,20 @@
 <script src="https://d3js.org/d3.v7.min.js" crossorigin="anonymous"></script>
 {% endblock %}
 {% block content %}
-<div class="flex items-center gap-4 mb-6">
-    <h1 class="text-2xl font-bold">Site Mind-Map</h1>
-    <a href="/projects/{{ project.id }}"
-       class="inline-flex items-center px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border hover:bg-accent transition-colors">
-        Back to Project
-    </a>
+<a href="/projects/{{ project.id }}" class="back-link">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    {{ project.name }}
+</a>
+
+<div class="page-header mb-6">
+    <h1>Site Mind-Map</h1>
 </div>
-<div id="mindmap-container" class="bg-card border border-border rounded-lg p-5 min-h-[500px]"
-     data-sitemap-url="/api/projects/{{ project.id }}/sitemap"></div>
+
+<div id="mindmap-container"
+     data-sitemap-url="/api/projects/{{ project.id }}/sitemap">
+</div>
 {% endblock %}
+
 {% block scripts %}
 <script src="/static/js/mindmap.js"></script>
 {% endblock %}

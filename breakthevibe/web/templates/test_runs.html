@@ -1,48 +1,53 @@
 {% extends "base.html" %}
 {% block title %}Test Runs — {{ project.name }}{% endblock %}
 {% block content %}
-<div class="flex items-center gap-4 mb-6">
-    <h1 class="text-2xl font-bold">Test Runs</h1>
-    <a href="/projects/{{ project.id }}"
-       class="inline-flex items-center px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border hover:bg-accent transition-colors">
-        Back to Project
-    </a>
+<a href="/projects/{{ project.id }}" class="back-link">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    {{ project.name }}
+</a>
+
+<div class="page-header mb-6">
+    <h1>Test Runs</h1>
 </div>
 
 {% if runs %}
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 stagger-children">
     {% for run in runs %}
-    <a href="/runs/{{ run.run_id }}" class="bg-card border border-border rounded-lg p-5 hover:border-primary/50 transition-colors block no-underline">
-        <div class="flex justify-between items-center">
-            <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase
-                {% if run.status == 'passed' %}bg-emerald-900/50 text-emerald-300
-                {% elif run.status == 'failed' %}bg-red-900/50 text-red-300
-                {% elif run.status == 'running' %}bg-blue-900/50 text-blue-300
-                {% else %}bg-muted text-muted-foreground{% endif %}">
+    <a href="/runs/{{ run.run_id }}" class="card card-interactive card-content block no-underline">
+        <div class="flex justify-between items-center mb-4">
+            <span class="badge
+                {% if run.status == 'passed' %}badge-success
+                {% elif run.status == 'failed' %}badge-destructive
+                {% elif run.status == 'running' %}badge-info
+                {% else %}badge-secondary{% endif %}">
                 {{ run.status }}
             </span>
-            <span class="text-sm text-muted-foreground font-mono">{{ run.run_id[:8] }}</span>
+            <span class="text-[0.75rem] text-muted-foreground font-mono">{{ run.run_id[:8] }}</span>
         </div>
-        <div class="grid grid-cols-3 gap-4 mt-4">
+        <div class="grid grid-cols-3 gap-4">
             <div class="text-center">
-                <div class="text-lg font-semibold">{{ run.total }}</div>
-                <div class="text-xs text-muted-foreground">Total</div>
+                <div class="text-lg font-semibold tracking-tight">{{ run.total }}</div>
+                <div class="stat-label">Total</div>
             </div>
             <div class="text-center">
-                <div class="text-lg font-semibold text-success">{{ run.passed }}</div>
-                <div class="text-xs text-muted-foreground">Passed</div>
+                <div class="text-lg font-semibold tracking-tight text-success">{{ run.passed }}</div>
+                <div class="stat-label">Passed</div>
             </div>
             <div class="text-center">
-                <div class="text-lg font-semibold text-destructive">{{ run.failed }}</div>
-                <div class="text-xs text-muted-foreground">Failed</div>
+                <div class="text-lg font-semibold tracking-tight text-destructive">{{ run.failed }}</div>
+                <div class="stat-label">Failed</div>
             </div>
         </div>
     </a>
     {% endfor %}
 </div>
 {% else %}
-<div class="bg-card border border-border rounded-lg p-8 text-center">
-    <p class="text-sm text-muted-foreground">No test runs yet. Execute the pipeline to generate test runs.</p>
+<div class="card">
+    <div class="empty-state">
+        <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        <p>No test runs yet</p>
+        <p>Execute the pipeline to generate test runs.</p>
+    </div>
 </div>
 {% endif %}
 {% endblock %}

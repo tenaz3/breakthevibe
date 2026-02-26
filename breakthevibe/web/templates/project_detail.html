@@ -1,106 +1,94 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} — BreakTheVibe{% endblock %}
 {% block content %}
+<!-- Back link -->
+<a href="/" class="back-link">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    Projects
+</a>
+
 <!-- Page header -->
-<div class="flex items-center gap-4 mb-2">
-    <h1 class="text-2xl font-bold text-foreground">{{ project.name }}</h1>
-    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
-        {% if project.status == 'ready' %}bg-emerald-900/40 text-emerald-300 border border-emerald-700/50
-        {% elif project.status == 'crawling' or project.status == 'running' %}bg-yellow-900/40 text-yellow-300 border border-yellow-700/50
-        {% elif project.status == 'failed' %}bg-red-900/40 text-red-300 border border-red-700/50
-        {% else %}bg-secondary text-secondary-foreground border border-border
-        {% endif %}">
+<div class="page-header">
+    <h1>{{ project.name }}</h1>
+    <span class="badge
+        {% if project.status == 'ready' %}badge-success
+        {% elif project.status == 'crawling' or project.status == 'running' %}badge-warning
+        {% elif project.status == 'failed' %}badge-destructive
+        {% else %}badge-secondary{% endif %}">
         {{ project.status }}
     </span>
 </div>
-<p class="text-muted-foreground text-sm mb-6">{{ project.url }}</p>
+<p class="page-description">{{ project.url }}</p>
 
 <!-- Action bar -->
-<div class="flex flex-wrap items-center gap-3 mb-8">
-    <button class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium
-                    bg-primary text-primary-foreground hover:bg-primary-hover transition-colors
-                    disabled:opacity-50 disabled:pointer-events-none"
+<div class="page-actions mb-8">
+    <button class="btn btn-primary"
             hx-post="/api/projects/{{ project.id }}/crawl"
             hx-swap="none"
             hx-disabled-elt="this"
-            hx-on::after-request="if(event.detail.successful){showToast('Crawl started — this may take a few minutes','success')}else{showToast('Failed to start crawl')}">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+            hx-on::after-request="if(event.detail.successful){showToast('Crawl started','success')}else{showToast('Failed to start crawl')}">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
         Crawl
     </button>
-    <button class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium
-                    bg-primary text-primary-foreground hover:bg-primary-hover transition-colors
-                    disabled:opacity-50 disabled:pointer-events-none"
+    <button class="btn btn-primary"
             hx-post="/api/projects/{{ project.id }}/generate"
             hx-swap="none"
             hx-disabled-elt="this"
-            hx-on::after-request="if(event.detail.successful){showToast('Test generation started','success')}else{showToast('Failed to start test generation')}">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-        Generate Tests
+            hx-on::after-request="if(event.detail.successful){showToast('Test generation started','success')}else{showToast('Failed to generate tests')}">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        Generate
     </button>
-    <button class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium
-                    bg-primary text-primary-foreground hover:bg-primary-hover transition-colors
-                    disabled:opacity-50 disabled:pointer-events-none"
+    <button class="btn btn-primary"
             hx-post="/api/projects/{{ project.id }}/run"
             hx-swap="none"
             hx-disabled-elt="this"
-            hx-on::after-request="if(event.detail.successful){showToast('Test run started','success')}else{showToast('Failed to start test run')}">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            hx-on::after-request="if(event.detail.successful){showToast('Test run started','success')}else{showToast('Failed to run tests')}">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>
         Run Tests
     </button>
 
-    <div class="w-px h-6 bg-border mx-1"></div>
+    <div class="separator-vertical"></div>
 
-    <a href="/projects/{{ project.id }}/suites"
-       class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
-              bg-secondary text-secondary-foreground hover:bg-border transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-        View Test Suites
+    <a href="/projects/{{ project.id }}/suites" class="btn btn-secondary">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Suites
     </a>
-    <a href="/projects/{{ project.id }}/sitemap"
-       class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
-              bg-secondary text-secondary-foreground hover:bg-border transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-        View Mind-Map
+    <a href="/projects/{{ project.id }}/sitemap" class="btn btn-secondary">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+        Mind-Map
     </a>
-    <a href="/projects/{{ project.id }}/rules"
-       class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
-              bg-secondary text-secondary-foreground hover:bg-border transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-        Edit Rules
+    <a href="/projects/{{ project.id }}/rules" class="btn btn-secondary">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+        Rules
     </a>
 </div>
 
 <!-- Tabs -->
-<div class="border-b border-border mb-6">
-    <div class="flex gap-0" role="tablist">
-        <button role="tab" aria-selected="true" data-tab="runs"
-                class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 transition-colors
-                       border-primary text-foreground">
-            Test Runs
-        </button>
-        <button role="tab" aria-selected="false" data-tab="sitemap"
-                class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 transition-colors
-                       border-transparent text-muted-foreground hover:text-foreground hover:border-border">
-            Site Map
-        </button>
-    </div>
+<div class="tab-list mb-6" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="runs" class="tab-trigger active">
+        Test Runs
+    </button>
+    <button role="tab" aria-selected="false" data-tab="sitemap" class="tab-trigger">
+        Site Map
+    </button>
 </div>
 
-<!-- Tab panels -->
+<!-- Tab: Test Runs -->
 <div id="tab-runs" class="tab-panel" role="tabpanel">
-    <div class="flex items-center justify-center py-12">
-        <div class="animate-pulse flex items-center gap-2 text-muted-foreground text-sm">
+    <div class="flex items-center justify-center py-16">
+        <div class="flex items-center gap-2 text-muted-foreground text-[0.8125rem]">
             <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-            Loading test runs...
+            Loading...
         </div>
     </div>
 </div>
 
+<!-- Tab: Site Map -->
 <div id="tab-sitemap" class="tab-panel hidden" role="tabpanel">
-    <div class="flex items-center justify-center py-12">
-        <div class="animate-pulse flex items-center gap-2 text-muted-foreground text-sm">
+    <div class="flex items-center justify-center py-16">
+        <div class="flex items-center gap-2 text-muted-foreground text-[0.8125rem]">
             <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-            Loading sitemap...
+            Loading...
         </div>
     </div>
 </div>
@@ -111,19 +99,17 @@
 (function() {
     var PROJECT_ID = "{{ project.id }}";
 
-    /* ── Tab switching ─────────────────────────────────────── */
-    var tabBtns = document.querySelectorAll('.tab-btn');
+    /* ── Tab switching ───────────────────────────────────────── */
+    var tabBtns = document.querySelectorAll('.tab-trigger');
     var tabPanels = document.querySelectorAll('.tab-panel');
 
     tabBtns.forEach(function(btn) {
         btn.addEventListener('click', function() {
             tabBtns.forEach(function(b) {
-                b.classList.remove('border-primary', 'text-foreground');
-                b.classList.add('border-transparent', 'text-muted-foreground');
+                b.classList.remove('active');
                 b.setAttribute('aria-selected', 'false');
             });
-            btn.classList.remove('border-transparent', 'text-muted-foreground');
-            btn.classList.add('border-primary', 'text-foreground');
+            btn.classList.add('active');
             btn.setAttribute('aria-selected', 'true');
 
             tabPanels.forEach(function(p) { p.classList.add('hidden'); });
@@ -132,18 +118,18 @@
         });
     });
 
-    /* ── DOM helpers ───────────────────────────────────────── */
-    function el(tag, classes, textContent) {
+    /* ── DOM helpers ──────────────────────────────────────────── */
+    function el(tag, classes, text) {
         var node = document.createElement(tag);
         if (classes) node.className = classes;
-        if (textContent !== undefined) node.textContent = textContent;
+        if (text !== undefined) node.textContent = text;
         return node;
     }
 
-    function svgIcon(pathD, classes) {
+    function svgIcon(pathD, cls) {
         var ns = 'http://www.w3.org/2000/svg';
         var svg = document.createElementNS(ns, 'svg');
-        svg.setAttribute('class', classes || 'w-5 h-5');
+        svg.setAttribute('class', cls || 'w-5 h-5');
         svg.setAttribute('fill', 'none');
         svg.setAttribute('stroke', 'currentColor');
         svg.setAttribute('viewBox', '0 0 24 24');
@@ -171,12 +157,12 @@
         children.forEach(function(c) { parent.appendChild(c); });
     }
 
-    /* ── Test Runs tab ─────────────────────────────────────── */
+    /* ── Test Runs ───────────────────────────────────────────── */
     function renderEmptyState(iconPath, heading, subtitle) {
-        var wrapper = el('div', 'flex flex-col items-center justify-center py-16 text-center');
-        wrapper.appendChild(svgIcon(iconPath, 'w-12 h-12 text-muted-foreground/40 mb-4'));
-        wrapper.appendChild(el('p', 'text-muted-foreground text-sm font-medium mb-1', heading));
-        wrapper.appendChild(el('p', 'text-muted-foreground/70 text-xs', subtitle));
+        var wrapper = el('div', 'empty-state');
+        wrapper.appendChild(svgIcon(iconPath, 'w-10 h-10 mb-4'));
+        wrapper.appendChild(el('p', 'text-[0.875rem] font-medium text-muted-foreground mb-1', heading));
+        wrapper.appendChild(el('p', 'text-[0.8125rem] text-muted-foreground/70', subtitle));
         return wrapper;
     }
 
@@ -191,28 +177,25 @@
         }
 
         var isSuccess = data.status === 'completed';
-        var card = el('div', 'rounded-lg border border-border bg-card p-5');
+        var card = el('div', 'card card-content');
 
-        /* Header row */
+        /* Header */
         var header = el('div', 'flex items-center justify-between mb-4');
         var left = el('div', 'flex items-center gap-3');
         left.appendChild(svgIcon(
             isSuccess
                 ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
                 : 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z',
-            isSuccess ? 'w-5 h-5 text-emerald-400' : 'w-5 h-5 text-red-400'
+            isSuccess ? 'w-5 h-5 text-success' : 'w-5 h-5 text-destructive'
         ));
         var info = el('div');
-        info.appendChild(el('p', 'text-sm font-medium text-foreground', 'Latest Run'));
-        if (data.run_id) info.appendChild(el('p', 'text-xs text-muted-foreground font-mono', data.run_id));
+        info.appendChild(el('p', 'text-[0.8125rem] font-medium text-foreground', 'Latest Run'));
+        if (data.run_id) info.appendChild(el('p', 'text-[0.75rem] text-muted-foreground font-mono', data.run_id));
         left.appendChild(info);
         header.appendChild(left);
 
         var badge = el('span',
-            'inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border ' +
-            (isSuccess
-                ? 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50'
-                : 'bg-red-900/40 text-red-300 border-red-700/50'),
+            'badge ' + (isSuccess ? 'badge-success' : 'badge-destructive'),
             data.status
         );
         header.appendChild(badge);
@@ -220,31 +203,31 @@
 
         /* Duration */
         if (data.duration_seconds) {
-            card.appendChild(el('p', 'text-xs text-muted-foreground mb-3', 'Duration: ' + formatDuration(data.duration_seconds)));
+            card.appendChild(el('p', 'text-[0.75rem] text-muted-foreground mb-3', 'Duration: ' + formatDuration(data.duration_seconds)));
         }
 
-        /* Completed stages */
+        /* Stages */
         var stages = data.completed_stages || [];
         if (stages.length > 0) {
-            var stagesRow = el('div', 'flex flex-wrap gap-1.5');
+            var row = el('div', 'flex flex-wrap gap-1.5');
             stages.forEach(function(s) {
-                stagesRow.appendChild(el('span', 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-900/30 text-emerald-300', s));
+                row.appendChild(el('span', 'badge badge-success', s));
             });
-            card.appendChild(stagesRow);
+            card.appendChild(row);
         }
 
         /* Failed stage */
         if (data.failed_stage) {
-            var failedRow = el('div', 'mt-3');
-            failedRow.appendChild(el('span', 'text-xs text-muted-foreground', 'Failed at: '));
-            failedRow.appendChild(el('span', 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-900/30 text-red-300', data.failed_stage));
-            card.appendChild(failedRow);
+            var failRow = el('div', 'mt-3 flex items-center gap-2');
+            failRow.appendChild(el('span', 'text-[0.75rem] text-muted-foreground', 'Failed at:'));
+            failRow.appendChild(el('span', 'badge badge-destructive', data.failed_stage));
+            card.appendChild(failRow);
         }
 
-        /* Error message */
+        /* Error */
         if (data.error_message) {
-            var errWrap = el('div', 'mt-3 p-3 rounded-md bg-red-950/30 border border-red-900/40');
-            errWrap.appendChild(el('p', 'text-xs text-red-300 font-mono break-all', data.error_message));
+            var errWrap = el('div', 'callout callout-destructive mt-3');
+            errWrap.appendChild(el('p', 'text-[0.75rem] font-mono break-all', data.error_message));
             card.appendChild(errWrap);
         }
 
@@ -259,27 +242,28 @@
             })
             .then(renderTestRuns)
             .catch(function(err) {
-                var errBox = el('div', 'rounded-lg border border-destructive/30 bg-red-950/20 p-4');
-                errBox.appendChild(el('p', 'text-sm text-red-300', 'Failed to load test runs: ' + err.message));
+                var errBox = el('div', 'callout callout-destructive');
+                errBox.appendChild(el('p', 'text-[0.8125rem]', 'Failed to load test runs: ' + err.message));
                 clearAndAppend('tab-runs', errBox);
             });
     }
 
-    /* ── Site Map tab ──────────────────────────────────────── */
+    /* ── Site Map ────────────────────────────────────────────── */
     function buildTable(headers, rows, cellRenderer) {
-        var wrapper = el('div', 'rounded-lg border border-border overflow-hidden');
-        var table = el('table', 'w-full');
+        var wrapper = el('div', 'table-wrapper');
+        var table = el('table', 'table');
         var thead = el('thead');
-        var headRow = el('tr', 'bg-secondary/50');
+        var headRow = el('tr');
         headers.forEach(function(h) {
-            headRow.appendChild(el('th', 'text-left text-xs font-medium text-muted-foreground px-4 py-2.5' + (h.align === 'right' ? ' text-right' : ''), h.label));
+            var th = el('th', h.align === 'right' ? 'text-right' : '', h.label);
+            headRow.appendChild(th);
         });
         thead.appendChild(headRow);
         table.appendChild(thead);
 
         var tbody = el('tbody');
-        rows.forEach(function(row, i) {
-            var tr = el('tr', (i % 2 === 0 ? 'bg-card' : 'bg-card/50') + ' border-t border-border/50');
+        rows.forEach(function(row) {
+            var tr = el('tr');
             cellRenderer(tr, row);
             tbody.appendChild(tr);
         });
@@ -305,10 +289,9 @@
 
         if (pages.length > 0) {
             var section = el('div', 'mb-6');
-            var heading = el('h3', 'text-sm font-semibold text-foreground mb-3');
+            var heading = el('h3', 'text-[0.8125rem] font-semibold mb-3');
             heading.textContent = 'Pages ';
-            var count = el('span', 'text-muted-foreground font-normal', '(' + pages.length + ')');
-            heading.appendChild(count);
+            heading.appendChild(el('span', 'text-muted-foreground font-normal', '(' + pages.length + ')'));
             section.appendChild(heading);
 
             section.appendChild(buildTable(
@@ -318,9 +301,9 @@
                     var url = typeof page === 'string' ? page : (page.url || page.path || '');
                     var title = typeof page === 'object' ? (page.title || '') : '';
                     var status = typeof page === 'object' ? String(page.status_code || page.status || '') : '';
-                    tr.appendChild(el('td', 'px-4 py-2.5 text-sm font-mono text-foreground truncate max-w-xs', String(url)));
-                    tr.appendChild(el('td', 'px-4 py-2.5 text-sm text-muted-foreground', String(title)));
-                    tr.appendChild(el('td', 'px-4 py-2.5 text-sm text-right text-muted-foreground', status));
+                    tr.appendChild(el('td', 'font-mono text-foreground truncate max-w-xs', String(url)));
+                    tr.appendChild(el('td', 'text-muted-foreground', String(title)));
+                    tr.appendChild(el('td', 'text-right text-muted-foreground', status));
                 }
             ));
             fragments.push(section);
@@ -328,10 +311,9 @@
 
         if (endpoints.length > 0) {
             var epSection = el('div');
-            var epHeading = el('h3', 'text-sm font-semibold text-foreground mb-3');
+            var epHeading = el('h3', 'text-[0.8125rem] font-semibold mb-3');
             epHeading.textContent = 'API Endpoints ';
-            var epCount = el('span', 'text-muted-foreground font-normal', '(' + endpoints.length + ')');
-            epHeading.appendChild(epCount);
+            epHeading.appendChild(el('span', 'text-muted-foreground font-normal', '(' + endpoints.length + ')'));
             epSection.appendChild(epHeading);
 
             epSection.appendChild(buildTable(
@@ -340,13 +322,13 @@
                 function(tr, ep) {
                     var method = typeof ep === 'string' ? 'GET' : (ep.method || 'GET');
                     var path = typeof ep === 'string' ? ep : (ep.path || ep.url || '');
-                    var methodColor = method === 'GET' ? 'text-emerald-400'
-                        : method === 'POST' ? 'text-blue-400'
-                        : method === 'PUT' ? 'text-yellow-400'
-                        : method === 'DELETE' ? 'text-red-400'
+                    var methodColor = method === 'GET' ? 'text-success'
+                        : method === 'POST' ? 'text-ring'
+                        : method === 'PUT' ? 'text-warning'
+                        : method === 'DELETE' ? 'text-destructive'
                         : 'text-muted-foreground';
-                    tr.appendChild(el('td', 'px-4 py-2.5 text-xs font-mono font-semibold ' + methodColor, String(method)));
-                    tr.appendChild(el('td', 'px-4 py-2.5 text-sm font-mono text-foreground', String(path)));
+                    tr.appendChild(el('td', 'font-mono font-semibold text-[0.75rem] ' + methodColor, String(method)));
+                    tr.appendChild(el('td', 'font-mono text-foreground', String(path)));
                 }
             ));
             fragments.push(epSection);
@@ -368,16 +350,16 @@
             })
             .then(renderSitemap)
             .catch(function(err) {
-                var errBox = el('div', 'rounded-lg border border-destructive/30 bg-red-950/20 p-4');
-                errBox.appendChild(el('p', 'text-sm text-red-300', 'Failed to load sitemap: ' + err.message));
+                var errBox = el('div', 'callout callout-destructive');
+                errBox.appendChild(el('p', 'text-[0.8125rem]', 'Failed to load sitemap: ' + err.message));
                 clearAndAppend('tab-sitemap', errBox);
             });
     }
 
-    /* ── Lazy-load sitemap on tab switch ───────────────────── */
+    /* ── Lazy-load sitemap ───────────────────────────────────── */
     document.querySelector('[data-tab="sitemap"]').addEventListener('click', loadSitemap);
 
-    /* ── Initial load ──────────────────────────────────────── */
+    /* ── Initial load ────────────────────────────────────────── */
     loadTestRuns();
 })();
 </script>
