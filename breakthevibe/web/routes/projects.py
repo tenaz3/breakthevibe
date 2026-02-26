@@ -6,8 +6,10 @@ from typing import Any
 
 import structlog
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field, HttpUrl
 
+from breakthevibe.config.settings import get_settings
 from breakthevibe.utils.sanitize import is_safe_url
 from breakthevibe.web.dependencies import project_repo
 
@@ -34,8 +36,8 @@ class ProjectResponse(BaseModel):
 
 @router.post("", status_code=201, response_model=ProjectResponse)
 async def create_project(body: CreateProjectRequest) -> dict[str, Any]:
-    # SSRF protection (#14)
-    if not is_safe_url(str(body.url)):
+    settings = get_settings()
+    if not settings.allow_private_urls and not is_safe_url(str(body.url)):
         raise HTTPException(status_code=422, detail="URL targets a private or reserved IP address")
     project = await project_repo.create(
         name=body.name,
@@ -58,8 +60,9 @@ async def get_project(project_id: str) -> dict[str, Any]:
     return project
 
 
-@router.delete("/{project_id}", status_code=204)
-async def delete_project(project_id: str) -> None:
+@router.delete("/{project_id}")
+async def delete_project(project_id: str) -> Response:
     deleted = await project_repo.delete(project_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Project not found")
+    return Response(content="", status_code=200, media_type="text/html")

@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     admin_username: str | None = None
     admin_password: str | None = None
 
+    # SSRF
+    allow_private_urls: bool = True
+
     # LLM Providers (all optional)
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None

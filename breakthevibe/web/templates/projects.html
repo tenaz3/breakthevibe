@@ -1,43 +1,73 @@
 {% extends "base.html" %}
 {% block title %}Projects — BreakTheVibe{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1>Projects</h1>
-    <button class="btn btn-primary" onclick="document.getElementById('new-project-form').style.display='block'">
+<div class="flex items-center gap-4 mb-6">
+    <h1 class="text-2xl font-bold">Projects</h1>
+    <button class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors"
+            onclick="document.getElementById('new-project-form').classList.remove('hidden')">
         + New Project
     </button>
 </div>
 
-<form id="new-project-form" style="display:none" class="card"
-      hx-post="/api/projects" hx-target="#project-grid" hx-swap="beforeend" hx-ext="json-enc"
-      hx-on::after-request="this.reset(); this.style.display='none'; location.reload()">
-    <h3>Create Project</h3>
-    <label>Name <input type="text" name="name" required minlength="1"></label>
-    <label>URL <input type="url" name="url" required placeholder="https://example.com"></label>
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Create</button>
-        <button type="button" class="btn" onclick="this.closest('form').style.display='none'">Cancel</button>
-    </div>
-</form>
+<div id="new-project-form" class="hidden bg-card border border-border rounded-lg p-5 mb-6"
+     hx-ext="json-enc">
+    <h3 class="text-lg font-semibold mb-4">Create Project</h3>
+    <form id="create-project-form"
+          hx-post="/api/projects" hx-target="#project-grid" hx-swap="beforeend"
+          hx-on::after-request="if(event.detail.successful){this.reset();document.getElementById('new-project-form').classList.add('hidden');showToast('Project created successfully','success');setTimeout(function(){location.reload()},800)}else{var msg='Failed to create project';try{var d=JSON.parse(event.detail.xhr.responseText);if(d.detail)msg=d.detail}catch(e){}showToast(msg)}">
+        <label class="block mb-4">
+            <span class="text-sm text-muted-foreground">Name</span>
+            <input type="text" name="name" required minlength="1"
+                   class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+        </label>
+        <label class="block mb-4">
+            <span class="text-sm text-muted-foreground">URL</span>
+            <input type="url" name="url" required placeholder="https://example.com"
+                   class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+        </label>
+        <div class="flex gap-3">
+            <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors">
+                Create
+            </button>
+            <button type="button"
+                    class="inline-flex items-center px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium border border-border hover:bg-accent transition-colors"
+                    onclick="document.getElementById('new-project-form').classList.add('hidden')">
+                Cancel
+            </button>
+        </div>
+    </form>
+</div>
 
-<div id="project-grid" class="card-grid">
+<div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for project in projects %}
-    <div class="card" id="project-{{ project.id }}">
-        <h3>{{ project.name }}</h3>
-        <p class="text-muted">{{ project.url }}</p>
-        <span class="badge badge-{{ project.status }}">{{ project.status }}</span>
-        <div class="card-actions">
-            <a href="/projects/{{ project.id }}" class="btn btn-sm">View</a>
-            <button class="btn btn-sm btn-danger"
+    <div class="bg-card border border-border rounded-lg p-5 hover:border-primary/50 transition-colors" id="project-{{ project.id }}">
+        <h3 class="font-semibold text-foreground mb-1">{{ project.name }}</h3>
+        <p class="text-sm text-muted-foreground mb-3">{{ project.url }}</p>
+        <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase
+            {% if project.status == 'passed' or project.status == 'healthy' %}bg-emerald-900/50 text-emerald-300
+            {% elif project.status == 'failed' %}bg-red-900/50 text-red-300
+            {% elif project.status == 'running' %}bg-blue-900/50 text-blue-300
+            {% else %}bg-muted text-muted-foreground{% endif %}">
+            {{ project.status }}
+        </span>
+        <div class="flex gap-2 mt-4">
+            <a href="/projects/{{ project.id }}"
+               class="inline-flex items-center px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border hover:bg-accent transition-colors">
+                View
+            </a>
+            <button class="inline-flex items-center px-3 py-1.5 rounded-md bg-destructive text-white text-xs font-medium hover:bg-destructive-hover transition-colors"
                     hx-delete="/api/projects/{{ project.id }}"
                     hx-target="#project-{{ project.id }}"
                     hx-swap="outerHTML"
-                    hx-confirm="Delete this project?">Delete</button>
+                    hx-confirm="Delete this project?"
+                    hx-on::after-request="if(event.detail.successful){showToast('Project deleted','success')}else{showToast('Failed to delete project')}">
+                Delete
+            </button>
         </div>
     </div>
     {% endfor %}
     {% if not projects %}
-    <p class="text-muted">No projects yet. Create one to get started.</p>
+    <p class="text-sm text-muted-foreground col-span-full">No projects yet. Create one to get started.</p>
     {% endif %}
 </div>
 {% endblock %}

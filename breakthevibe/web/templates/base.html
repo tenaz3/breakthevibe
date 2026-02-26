@@ -1,27 +1,95 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}BreakTheVibe{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#0f1117',
+                        foreground: '#e4e4e7',
+                        card: '#1a1d27',
+                        'card-foreground': '#e4e4e7',
+                        border: '#2a2d3a',
+                        input: '#2a2d3a',
+                        ring: '#6366f1',
+                        primary: { DEFAULT: '#6366f1', foreground: '#ffffff', hover: '#818cf8' },
+                        secondary: { DEFAULT: '#2a2d3a', foreground: '#e4e4e7' },
+                        destructive: { DEFAULT: '#ef4444', foreground: '#ffffff', hover: '#f87171' },
+                        muted: { DEFAULT: '#2a2d3a', foreground: '#71717a' },
+                        accent: { DEFAULT: '#2a2d3a', foreground: '#e4e4e7' },
+                        success: '#22c55e',
+                        warning: '#f59e0b',
+                    },
+                    borderRadius: { lg: '0.5rem', md: '0.375rem', sm: '0.25rem' },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['SF Mono', 'Fira Code', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx-ext-json-enc@2.0.1/json-enc.js"></script>
     {% block head %}{% endblock %}
 </head>
-<body>
-    <nav class="navbar">
-        <div class="container nav-content">
-            <a href="/" class="nav-brand">BreakTheVibe</a>
-            <div class="nav-links">
-                <a href="/">Projects</a>
-                <a href="/settings/llm">LLM Settings</a>
+<body class="bg-background text-foreground min-h-screen antialiased">
+    <nav class="bg-card border-b border-border py-3">
+        <div class="max-w-7xl mx-auto px-6 flex items-center justify-between">
+            <a href="/" class="text-primary font-bold text-xl hover:text-primary-hover transition-colors">BreakTheVibe</a>
+            <div class="flex gap-6">
+                <a href="/" class="text-muted-foreground text-sm hover:text-foreground transition-colors">Projects</a>
+                <a href="/settings/llm" class="text-muted-foreground text-sm hover:text-foreground transition-colors">LLM Settings</a>
             </div>
         </div>
     </nav>
-    <main class="container">
+    <main class="max-w-7xl mx-auto px-6 py-6">
         {% block content %}{% endblock %}
     </main>
+
+    <!-- Toast notification container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+    <script>
+        function showToast(message, type) {
+            type = type || 'error';
+            var container = document.getElementById('toast-container');
+            var toast = document.createElement('div');
+            var colorMap = {
+                error: 'bg-destructive text-white border-destructive',
+                success: 'bg-emerald-900/90 text-emerald-100 border-emerald-700',
+                info: 'bg-card text-foreground border-border',
+            };
+            toast.className = 'flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg backdrop-blur-sm transition-all duration-300 translate-x-full ' + (colorMap[type] || colorMap.info);
+
+            var span = document.createElement('span');
+            span.className = 'text-sm font-medium';
+            span.textContent = message;
+            toast.appendChild(span);
+
+            var closeBtn = document.createElement('button');
+            closeBtn.className = 'ml-2 opacity-70 hover:opacity-100 transition-opacity text-current';
+            closeBtn.textContent = '\u00d7';
+            closeBtn.style.fontSize = '1.25rem';
+            closeBtn.style.lineHeight = '1';
+            closeBtn.addEventListener('click', function() { toast.remove(); });
+            toast.appendChild(closeBtn);
+
+            container.appendChild(toast);
+            requestAnimationFrame(function() { toast.classList.remove('translate-x-full'); });
+            setTimeout(function() {
+                toast.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(function() { toast.remove(); }, 300);
+            }, 5000);
+        }
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

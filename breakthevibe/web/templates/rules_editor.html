@@ -1,27 +1,40 @@
 {% extends "base.html" %}
 {% block title %}Rules Editor — BreakTheVibe{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1>Rules Editor</h1>
-    <a href="/projects/{{ project.id }}" class="btn">Back to Project</a>
+<div class="flex items-center gap-4 mb-6">
+    <h1 class="text-2xl font-bold">Rules Editor</h1>
+    <a href="/projects/{{ project.id }}"
+       class="inline-flex items-center px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border hover:bg-accent transition-colors">
+        Back to Project
+    </a>
 </div>
 
-<form hx-put="/api/projects/{{ project.id }}/rules"
-      hx-target="#save-status" hx-swap="innerHTML"
+<form hx-put="/api/projects/{{ project.id }}/rules" hx-swap="none"
+      hx-on::after-request="if(event.detail.successful){showToast('Rules saved successfully','success')}else{showToast('Failed to save rules')}"
       enctype="application/x-www-form-urlencoded">
-    <textarea class="code-editor" name="rules_yaml" spellcheck="false">{{ rules_yaml }}</textarea>
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save Rules</button>
-        <button type="button" class="btn" id="validate-btn">Validate</button>
-        <button type="button" class="btn" id="reset-btn">Reset to Defaults</button>
+    <textarea name="rules_yaml" spellcheck="false"
+              class="w-full min-h-[400px] px-4 py-3 bg-background border border-border rounded-lg text-foreground text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+    >{{ rules_yaml }}</textarea>
+    <div class="flex gap-3 mt-4">
+        <button type="submit"
+                class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors">
+            Save Rules
+        </button>
+        <button type="button" id="validate-btn"
+                class="inline-flex items-center px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium border border-border hover:bg-accent transition-colors">
+            Validate
+        </button>
+        <button type="button" id="reset-btn"
+                class="inline-flex items-center px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium border border-border hover:bg-accent transition-colors">
+            Reset to Defaults
+        </button>
     </div>
-    <div id="save-status" style="margin-top:0.5rem"></div>
 </form>
 
-<details class="card" style="margin-top:1.5rem" open>
-    <summary style="cursor:pointer"><strong>Configuration Reference</strong></summary>
-    <div style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-muted)">
-        <pre>crawl:
+<details class="bg-card border border-border rounded-lg p-5 mt-6" open>
+    <summary class="cursor-pointer text-lg font-semibold">Configuration Reference</summary>
+    <div class="mt-3 text-sm text-muted-foreground">
+        <pre id="default-config" class="whitespace-pre-wrap">crawl:
   max_depth: 5           # Maximum crawl depth
   skip_urls: []          # Glob patterns to skip
   scroll_behavior: auto  # auto | none | full
@@ -57,7 +70,7 @@ execution:
 {% block scripts %}
 <script>
 document.getElementById('validate-btn')?.addEventListener('click', function() {
-    var yaml = document.querySelector('.code-editor').value;
+    var yaml = document.querySelector('[name=rules_yaml]').value;
     fetch('/api/rules/validate', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -65,21 +78,19 @@ document.getElementById('validate-btn')?.addEventListener('click', function() {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        var status = document.getElementById('save-status');
-        status.textContent = '';
-        var span = document.createElement('span');
         if (data.valid) {
-            span.style.color = 'var(--success)';
-            span.textContent = 'Valid YAML configuration';
+            showToast('Valid YAML configuration', 'success');
         } else {
-            span.style.color = 'var(--danger)';
-            span.textContent = 'Invalid: ' + data.error;
+            showToast('Invalid: ' + data.error, 'error');
         }
-        status.appendChild(span);
+    })
+    .catch(function() {
+        showToast('Validation request failed', 'error');
     });
 });
 document.getElementById('reset-btn')?.addEventListener('click', function() {
-    document.querySelector('.code-editor').value = '';
+    document.querySelector('[name=rules_yaml]').value =
+        document.getElementById('default-config').textContent;
 });
 </script>
 {% endblock %}

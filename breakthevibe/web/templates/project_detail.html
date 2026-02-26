@@ -1,53 +1,384 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} — BreakTheVibe{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1>{{ project.name }}</h1>
-    <span class="badge badge-{{ project.status }}">{{ project.status }}</span>
+<!-- Page header -->
+<div class="flex items-center gap-4 mb-2">
+    <h1 class="text-2xl font-bold text-foreground">{{ project.name }}</h1>
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
+        {% if project.status == 'ready' %}bg-emerald-900/40 text-emerald-300 border border-emerald-700/50
+        {% elif project.status == 'crawling' or project.status == 'running' %}bg-yellow-900/40 text-yellow-300 border border-yellow-700/50
+        {% elif project.status == 'failed' %}bg-red-900/40 text-red-300 border border-red-700/50
+        {% else %}bg-secondary text-secondary-foreground border border-border
+        {% endif %}">
+        {{ project.status }}
+    </span>
 </div>
-<p class="text-muted">{{ project.url }}</p>
+<p class="text-muted-foreground text-sm mb-6">{{ project.url }}</p>
 
-<div class="action-bar">
-    <button class="btn btn-primary"
+<!-- Action bar -->
+<div class="flex flex-wrap items-center gap-3 mb-8">
+    <button class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+                    bg-primary text-primary-foreground hover:bg-primary-hover transition-colors
+                    disabled:opacity-50 disabled:pointer-events-none"
             hx-post="/api/projects/{{ project.id }}/crawl"
-            hx-swap="none">Crawl</button>
-    <button class="btn btn-primary"
+            hx-swap="none"
+            hx-disabled-elt="this"
+            hx-on::after-request="if(event.detail.successful){showToast('Crawl started — this may take a few minutes','success')}else{showToast('Failed to start crawl')}">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+        Crawl
+    </button>
+    <button class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+                    bg-primary text-primary-foreground hover:bg-primary-hover transition-colors
+                    disabled:opacity-50 disabled:pointer-events-none"
             hx-post="/api/projects/{{ project.id }}/generate"
-            hx-swap="none">Generate Tests</button>
-    <button class="btn btn-primary"
+            hx-swap="none"
+            hx-disabled-elt="this"
+            hx-on::after-request="if(event.detail.successful){showToast('Test generation started','success')}else{showToast('Failed to start test generation')}">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        Generate Tests
+    </button>
+    <button class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+                    bg-primary text-primary-foreground hover:bg-primary-hover transition-colors
+                    disabled:opacity-50 disabled:pointer-events-none"
             hx-post="/api/projects/{{ project.id }}/run"
-            hx-swap="none">Run Tests</button>
-    <a href="/projects/{{ project.id }}/sitemap" class="btn">View Mind-Map</a>
-    <a href="/projects/{{ project.id }}/rules" class="btn">Edit Rules</a>
+            hx-swap="none"
+            hx-disabled-elt="this"
+            hx-on::after-request="if(event.detail.successful){showToast('Test run started','success')}else{showToast('Failed to start test run')}">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Run Tests
+    </button>
+
+    <div class="w-px h-6 bg-border mx-1"></div>
+
+    <a href="/projects/{{ project.id }}/suites"
+       class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+              bg-secondary text-secondary-foreground hover:bg-border transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        View Test Suites
+    </a>
+    <a href="/projects/{{ project.id }}/sitemap"
+       class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+              bg-secondary text-secondary-foreground hover:bg-border transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+        View Mind-Map
+    </a>
+    <a href="/projects/{{ project.id }}/rules"
+       class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+              bg-secondary text-secondary-foreground hover:bg-border transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Edit Rules
+    </a>
 </div>
 
-<div class="tabs">
-    <button class="tab active" data-tab="runs">Test Runs</button>
-    <button class="tab" data-tab="sitemap">Site Map</button>
-</div>
-
-<div id="tab-runs" class="tab-content active">
-    <div hx-get="/api/runs/latest/results" hx-trigger="load" hx-target="this">
-        <p class="text-muted">Loading test runs...</p>
+<!-- Tabs -->
+<div class="border-b border-border mb-6">
+    <div class="flex gap-0" role="tablist">
+        <button role="tab" aria-selected="true" data-tab="runs"
+                class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 transition-colors
+                       border-primary text-foreground">
+            Test Runs
+        </button>
+        <button role="tab" aria-selected="false" data-tab="sitemap"
+                class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 transition-colors
+                       border-transparent text-muted-foreground hover:text-foreground hover:border-border">
+            Site Map
+        </button>
     </div>
 </div>
 
-<div id="tab-sitemap" class="tab-content" style="display:none">
-    <div hx-get="/api/projects/{{ project.id }}/sitemap" hx-trigger="revealed" hx-target="this">
-        <p class="text-muted">Loading sitemap...</p>
+<!-- Tab panels -->
+<div id="tab-runs" class="tab-panel" role="tabpanel">
+    <div class="flex items-center justify-center py-12">
+        <div class="animate-pulse flex items-center gap-2 text-muted-foreground text-sm">
+            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            Loading test runs...
+        </div>
+    </div>
+</div>
+
+<div id="tab-sitemap" class="tab-panel hidden" role="tabpanel">
+    <div class="flex items-center justify-center py-12">
+        <div class="animate-pulse flex items-center gap-2 text-muted-foreground text-sm">
+            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            Loading sitemap...
+        </div>
     </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
-document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => { c.style.display = 'none'; c.classList.remove('active'); });
-        tab.classList.add('active');
-        const target = document.getElementById('tab-' + tab.dataset.tab);
-        if (target) { target.style.display = 'block'; target.classList.add('active'); }
+(function() {
+    var PROJECT_ID = "{{ project.id }}";
+
+    /* ── Tab switching ─────────────────────────────────────── */
+    var tabBtns = document.querySelectorAll('.tab-btn');
+    var tabPanels = document.querySelectorAll('.tab-panel');
+
+    tabBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            tabBtns.forEach(function(b) {
+                b.classList.remove('border-primary', 'text-foreground');
+                b.classList.add('border-transparent', 'text-muted-foreground');
+                b.setAttribute('aria-selected', 'false');
+            });
+            btn.classList.remove('border-transparent', 'text-muted-foreground');
+            btn.classList.add('border-primary', 'text-foreground');
+            btn.setAttribute('aria-selected', 'true');
+
+            tabPanels.forEach(function(p) { p.classList.add('hidden'); });
+            var panel = document.getElementById('tab-' + btn.dataset.tab);
+            if (panel) panel.classList.remove('hidden');
+        });
     });
-});
+
+    /* ── DOM helpers ───────────────────────────────────────── */
+    function el(tag, classes, textContent) {
+        var node = document.createElement(tag);
+        if (classes) node.className = classes;
+        if (textContent !== undefined) node.textContent = textContent;
+        return node;
+    }
+
+    function svgIcon(pathD, classes) {
+        var ns = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('class', classes || 'w-5 h-5');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        var path = document.createElementNS(ns, 'path');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('d', pathD);
+        svg.appendChild(path);
+        return svg;
+    }
+
+    function formatDuration(seconds) {
+        if (!seconds || seconds < 1) return '< 1s';
+        if (seconds < 60) return Math.round(seconds) + 's';
+        var m = Math.floor(seconds / 60);
+        var s = Math.round(seconds % 60);
+        return m + 'm ' + s + 's';
+    }
+
+    function clearAndAppend(parentId, children) {
+        var parent = document.getElementById(parentId);
+        parent.textContent = '';
+        if (!Array.isArray(children)) children = [children];
+        children.forEach(function(c) { parent.appendChild(c); });
+    }
+
+    /* ── Test Runs tab ─────────────────────────────────────── */
+    function renderEmptyState(iconPath, heading, subtitle) {
+        var wrapper = el('div', 'flex flex-col items-center justify-center py-16 text-center');
+        wrapper.appendChild(svgIcon(iconPath, 'w-12 h-12 text-muted-foreground/40 mb-4'));
+        wrapper.appendChild(el('p', 'text-muted-foreground text-sm font-medium mb-1', heading));
+        wrapper.appendChild(el('p', 'text-muted-foreground/70 text-xs', subtitle));
+        return wrapper;
+    }
+
+    function renderTestRuns(data) {
+        if (data.status === 'no_runs') {
+            clearAndAppend('tab-runs', renderEmptyState(
+                'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+                'No test runs yet',
+                'Run the pipeline to see results here.'
+            ));
+            return;
+        }
+
+        var isSuccess = data.status === 'completed';
+        var card = el('div', 'rounded-lg border border-border bg-card p-5');
+
+        /* Header row */
+        var header = el('div', 'flex items-center justify-between mb-4');
+        var left = el('div', 'flex items-center gap-3');
+        left.appendChild(svgIcon(
+            isSuccess
+                ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+                : 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z',
+            isSuccess ? 'w-5 h-5 text-emerald-400' : 'w-5 h-5 text-red-400'
+        ));
+        var info = el('div');
+        info.appendChild(el('p', 'text-sm font-medium text-foreground', 'Latest Run'));
+        if (data.run_id) info.appendChild(el('p', 'text-xs text-muted-foreground font-mono', data.run_id));
+        left.appendChild(info);
+        header.appendChild(left);
+
+        var badge = el('span',
+            'inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border ' +
+            (isSuccess
+                ? 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50'
+                : 'bg-red-900/40 text-red-300 border-red-700/50'),
+            data.status
+        );
+        header.appendChild(badge);
+        card.appendChild(header);
+
+        /* Duration */
+        if (data.duration_seconds) {
+            card.appendChild(el('p', 'text-xs text-muted-foreground mb-3', 'Duration: ' + formatDuration(data.duration_seconds)));
+        }
+
+        /* Completed stages */
+        var stages = data.completed_stages || [];
+        if (stages.length > 0) {
+            var stagesRow = el('div', 'flex flex-wrap gap-1.5');
+            stages.forEach(function(s) {
+                stagesRow.appendChild(el('span', 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-900/30 text-emerald-300', s));
+            });
+            card.appendChild(stagesRow);
+        }
+
+        /* Failed stage */
+        if (data.failed_stage) {
+            var failedRow = el('div', 'mt-3');
+            failedRow.appendChild(el('span', 'text-xs text-muted-foreground', 'Failed at: '));
+            failedRow.appendChild(el('span', 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-900/30 text-red-300', data.failed_stage));
+            card.appendChild(failedRow);
+        }
+
+        /* Error message */
+        if (data.error_message) {
+            var errWrap = el('div', 'mt-3 p-3 rounded-md bg-red-950/30 border border-red-900/40');
+            errWrap.appendChild(el('p', 'text-xs text-red-300 font-mono break-all', data.error_message));
+            card.appendChild(errWrap);
+        }
+
+        clearAndAppend('tab-runs', card);
+    }
+
+    function loadTestRuns() {
+        fetch('/api/projects/' + PROJECT_ID + '/results')
+            .then(function(res) {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            })
+            .then(renderTestRuns)
+            .catch(function(err) {
+                var errBox = el('div', 'rounded-lg border border-destructive/30 bg-red-950/20 p-4');
+                errBox.appendChild(el('p', 'text-sm text-red-300', 'Failed to load test runs: ' + err.message));
+                clearAndAppend('tab-runs', errBox);
+            });
+    }
+
+    /* ── Site Map tab ──────────────────────────────────────── */
+    function buildTable(headers, rows, cellRenderer) {
+        var wrapper = el('div', 'rounded-lg border border-border overflow-hidden');
+        var table = el('table', 'w-full');
+        var thead = el('thead');
+        var headRow = el('tr', 'bg-secondary/50');
+        headers.forEach(function(h) {
+            headRow.appendChild(el('th', 'text-left text-xs font-medium text-muted-foreground px-4 py-2.5' + (h.align === 'right' ? ' text-right' : ''), h.label));
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        var tbody = el('tbody');
+        rows.forEach(function(row, i) {
+            var tr = el('tr', (i % 2 === 0 ? 'bg-card' : 'bg-card/50') + ' border-t border-border/50');
+            cellRenderer(tr, row);
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        wrapper.appendChild(table);
+        return wrapper;
+    }
+
+    function renderSitemap(data) {
+        var pages = data.pages || [];
+        var endpoints = data.api_endpoints || [];
+
+        if (pages.length === 0 && endpoints.length === 0) {
+            clearAndAppend('tab-sitemap', renderEmptyState(
+                'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7',
+                'No sitemap data yet',
+                'Crawl the site first to build a sitemap.'
+            ));
+            return;
+        }
+
+        var fragments = [];
+
+        if (pages.length > 0) {
+            var section = el('div', 'mb-6');
+            var heading = el('h3', 'text-sm font-semibold text-foreground mb-3');
+            heading.textContent = 'Pages ';
+            var count = el('span', 'text-muted-foreground font-normal', '(' + pages.length + ')');
+            heading.appendChild(count);
+            section.appendChild(heading);
+
+            section.appendChild(buildTable(
+                [{ label: 'URL' }, { label: 'Title' }, { label: 'Status', align: 'right' }],
+                pages,
+                function(tr, page) {
+                    var url = typeof page === 'string' ? page : (page.url || page.path || '');
+                    var title = typeof page === 'object' ? (page.title || '') : '';
+                    var status = typeof page === 'object' ? String(page.status_code || page.status || '') : '';
+                    tr.appendChild(el('td', 'px-4 py-2.5 text-sm font-mono text-foreground truncate max-w-xs', String(url)));
+                    tr.appendChild(el('td', 'px-4 py-2.5 text-sm text-muted-foreground', String(title)));
+                    tr.appendChild(el('td', 'px-4 py-2.5 text-sm text-right text-muted-foreground', status));
+                }
+            ));
+            fragments.push(section);
+        }
+
+        if (endpoints.length > 0) {
+            var epSection = el('div');
+            var epHeading = el('h3', 'text-sm font-semibold text-foreground mb-3');
+            epHeading.textContent = 'API Endpoints ';
+            var epCount = el('span', 'text-muted-foreground font-normal', '(' + endpoints.length + ')');
+            epHeading.appendChild(epCount);
+            epSection.appendChild(epHeading);
+
+            epSection.appendChild(buildTable(
+                [{ label: 'Method' }, { label: 'Path' }],
+                endpoints,
+                function(tr, ep) {
+                    var method = typeof ep === 'string' ? 'GET' : (ep.method || 'GET');
+                    var path = typeof ep === 'string' ? ep : (ep.path || ep.url || '');
+                    var methodColor = method === 'GET' ? 'text-emerald-400'
+                        : method === 'POST' ? 'text-blue-400'
+                        : method === 'PUT' ? 'text-yellow-400'
+                        : method === 'DELETE' ? 'text-red-400'
+                        : 'text-muted-foreground';
+                    tr.appendChild(el('td', 'px-4 py-2.5 text-xs font-mono font-semibold ' + methodColor, String(method)));
+                    tr.appendChild(el('td', 'px-4 py-2.5 text-sm font-mono text-foreground', String(path)));
+                }
+            ));
+            fragments.push(epSection);
+        }
+
+        clearAndAppend('tab-sitemap', fragments);
+    }
+
+    var sitemapLoaded = false;
+
+    function loadSitemap() {
+        if (sitemapLoaded) return;
+        sitemapLoaded = true;
+
+        fetch('/api/projects/' + PROJECT_ID + '/sitemap')
+            .then(function(res) {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            })
+            .then(renderSitemap)
+            .catch(function(err) {
+                var errBox = el('div', 'rounded-lg border border-destructive/30 bg-red-950/20 p-4');
+                errBox.appendChild(el('p', 'text-sm text-red-300', 'Failed to load sitemap: ' + err.message));
+                clearAndAppend('tab-sitemap', errBox);
+            });
+    }
+
+    /* ── Lazy-load sitemap on tab switch ───────────────────── */
+    document.querySelector('[data-tab="sitemap"]').addEventListener('click', loadSitemap);
+
+    /* ── Initial load ──────────────────────────────────────── */
+    loadTestRuns();
+})();
 </script>
 {% endblock %}

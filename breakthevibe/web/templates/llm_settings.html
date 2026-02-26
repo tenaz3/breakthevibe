@@ -1,54 +1,81 @@
 {% extends "base.html" %}
 {% block title %}LLM Settings — BreakTheVibe{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1>LLM Settings</h1>
+<div class="flex items-center gap-4 mb-6">
+    <h1 class="text-2xl font-bold">LLM Settings</h1>
 </div>
 
-<form hx-put="/api/settings/llm" hx-target="#save-status" hx-swap="innerHTML"
+<form hx-put="/api/settings/llm" hx-swap="none"
+      hx-on::after-request="if(event.detail.successful){showToast('Settings saved successfully','success')}else{showToast('Failed to save settings')}"
       enctype="application/x-www-form-urlencoded">
 
-    <div class="card" style="margin-bottom:1rem">
-        <h3>Default Provider</h3>
-        <label>Provider
-            <select name="default_provider">
+    <div class="bg-card border border-border rounded-lg p-5 mb-4">
+        <h3 class="text-lg font-semibold mb-4">Default Provider</h3>
+        <label class="block mb-4">
+            <span class="text-sm text-muted-foreground">Provider</span>
+            <select name="default_provider"
+                    class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
                 <option value="anthropic" {% if settings.default_provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
                 <option value="openai" {% if settings.default_provider == 'openai' %}selected{% endif %}>OpenAI</option>
                 <option value="ollama" {% if settings.default_provider == 'ollama' %}selected{% endif %}>Ollama</option>
             </select>
         </label>
-        <label>Model <input type="text" name="default_model" value="{{ settings.default_model }}"></label>
+        <label class="block">
+            <span class="text-sm text-muted-foreground">Model</span>
+            <input type="text" name="default_model" value="{{ settings.default_model }}"
+                   class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+        </label>
     </div>
 
-    <div class="card" style="margin-bottom:1rem">
-        <h3>Per-Module Overrides</h3>
+    <div class="bg-card border border-border rounded-lg p-5 mb-4">
+        <h3 class="text-lg font-semibold mb-4">Per-Module Overrides</h3>
         {% for module in ['mapper', 'generator', 'agent'] %}
-        <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:0.75rem">
-            <legend style="color:var(--text-muted);font-size:0.85rem;padding:0 0.5rem">{{ module | capitalize }}</legend>
-            <label>Provider
-                <select name="modules_{{ module }}_provider">
+        <fieldset class="border border-border rounded-lg p-4 mb-3">
+            <legend class="text-sm text-muted-foreground px-2">{{ module | capitalize }}</legend>
+            <label class="block mb-3">
+                <span class="text-sm text-muted-foreground">Provider</span>
+                <select name="modules_{{ module }}_provider"
+                        class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
                     <option value="">Use default</option>
                     <option value="anthropic" {% if settings.modules[module].provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
                     <option value="openai" {% if settings.modules[module].provider == 'openai' %}selected{% endif %}>OpenAI</option>
                     <option value="ollama" {% if settings.modules[module].provider == 'ollama' %}selected{% endif %}>Ollama</option>
                 </select>
             </label>
-            <label>Model <input type="text" name="modules_{{ module }}_model" value="{{ settings.modules[module].model }}"></label>
+            <label class="block">
+                <span class="text-sm text-muted-foreground">Model</span>
+                <input type="text" name="modules_{{ module }}_model" value="{{ settings.modules[module].model }}"
+                       class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+            </label>
         </fieldset>
         {% endfor %}
     </div>
 
-    <div class="card" style="margin-bottom:1rem">
-        <h3>API Keys</h3>
-        <p class="text-muted" style="margin-bottom:0.75rem">In production, use environment variables (ANTHROPIC_API_KEY, OPENAI_API_KEY).</p>
-        <label>Anthropic API Key <input type="password" name="anthropic_api_key" placeholder="sk-ant-..."></label>
-        <label>OpenAI API Key <input type="password" name="openai_api_key" placeholder="sk-..."></label>
-        <label>Ollama Base URL <input type="text" name="ollama_base_url" value="{{ settings.providers.ollama.base_url }}"></label>
+    <div class="bg-card border border-border rounded-lg p-5 mb-4">
+        <h3 class="text-lg font-semibold mb-4">API Keys</h3>
+        <p class="text-sm text-muted-foreground mb-4">In production, use environment variables (ANTHROPIC_API_KEY, OPENAI_API_KEY).</p>
+        <label class="block mb-4">
+            <span class="text-sm text-muted-foreground">Anthropic API Key</span>
+            <input type="password" name="anthropic_api_key" placeholder="sk-ant-..."
+                   class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+        </label>
+        <label class="block mb-4">
+            <span class="text-sm text-muted-foreground">OpenAI API Key</span>
+            <input type="password" name="openai_api_key" placeholder="sk-..."
+                   class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+        </label>
+        <label class="block">
+            <span class="text-sm text-muted-foreground">Ollama Base URL</span>
+            <input type="text" name="ollama_base_url" value="{{ settings.providers.ollama.base_url }}"
+                   class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+        </label>
     </div>
 
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save Settings</button>
+    <div class="flex gap-3">
+        <button type="submit"
+                class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors">
+            Save Settings
+        </button>
     </div>
-    <div id="save-status" style="margin-top:0.5rem"></div>
 </form>
 {% endblock %}

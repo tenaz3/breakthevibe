@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — BreakTheVibe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#0f1117',
+                        foreground: '#e4e4e7',
+                        card: '#1a1d27',
+                        border: '#2a2d3a',
+                        ring: '#6366f1',
+                        primary: { DEFAULT: '#6366f1', foreground: '#ffffff', hover: '#818cf8' },
+                        muted: { foreground: '#71717a' },
+                        destructive: { DEFAULT: '#ef4444' },
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-foreground min-h-screen flex items-center justify-center antialiased">
+    <div class="bg-card border border-border rounded-lg p-8 w-full max-w-sm shadow-xl">
+        <h1 class="text-primary font-bold text-2xl mb-1">BreakTheVibe</h1>
+        <p class="text-muted-foreground text-sm mb-6">Sign in to continue</p>
+        <p id="login-error" class="hidden text-destructive text-sm mb-4 bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2"></p>
+        <form id="login-form" class="space-y-4">
+            <label class="block">
+                <span class="text-sm text-muted-foreground">Username</span>
+                <input type="text" name="username" required autocomplete="username"
+                       class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+            </label>
+            <label class="block">
+                <span class="text-sm text-muted-foreground">Password</span>
+                <input type="password" name="password" required autocomplete="current-password"
+                       class="mt-1 block w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+            </label>
+            <button type="submit"
+                    class="w-full flex justify-center items-center px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors">
+                Sign in
+            </button>
+        </form>
+    </div>
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            var form = e.target;
+            var errEl = document.getElementById('login-error');
+            errEl.classList.add('hidden');
+
+            var body = {
+                username: form.username.value,
+                password: form.password.value,
+            };
+
+            try {
+                var res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+
+                if (res.ok) {
+                    var next = new URLSearchParams(window.location.search).get('next') || '/';
+                    window.location.href = next;
+                } else {
+                    var data = await res.json();
+                    errEl.textContent = data.detail || 'Login failed';
+                    errEl.classList.remove('hidden');
+                }
+            } catch(err) {
+                errEl.textContent = 'Network error. Please try again.';
+                errEl.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

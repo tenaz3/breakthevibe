@@ -96,3 +96,19 @@ async def require_auth(request: Request) -> dict[str, Any]:
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
     return user
+
+
+async def require_auth_page(request: Request) -> dict[str, Any]:
+    """Like require_auth, but redirects to /login for browser page requests."""
+    from urllib.parse import quote
+
+    auth = get_session_auth()
+    token = request.cookies.get("session")
+    user = auth.validate_session(token) if token else None
+    if not user:
+        next_url = quote(str(request.url.path), safe="/")
+        raise HTTPException(
+            status_code=307,
+            headers={"Location": f"/login?next={next_url}"},
+        )
+    return user
