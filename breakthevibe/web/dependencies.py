@@ -90,6 +90,7 @@ async def _persist_test_run(project_id: str, result_data: dict[str, Any]) -> Non
 async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
     """Run the full pipeline as a background task."""
     from breakthevibe.web.pipeline import build_pipeline
+    from breakthevibe.web.sse import PipelineProgressEvent, progress_bus
 
     lock = _get_pipeline_lock(project_id)
     if lock.locked():
@@ -98,11 +99,26 @@ async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
 
     async with lock:
         logger.info("pipeline_background_start", project_id=project_id, url=url)
+
+        # Clear stale progress state from any previous run
+        progress_bus.clear(project_id)
+
+        def _progress(stage: str, status: str, error: str = "") -> None:
+            progress_bus.notify(
+                PipelineProgressEvent(
+                    project_id=project_id,
+                    stage=stage,
+                    status=status,
+                    error=error,
+                )
+            )
+
         try:
             orchestrator = await build_pipeline(
                 project_id=project_id,
                 url=url,
                 rules_yaml=rules_yaml,
+                progress_callback=_progress,
             )
             result = await orchestrator.run(project_id=project_id, url=url, rules_yaml=rules_yaml)
 
@@ -159,6 +175,14 @@ async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
 
         except Exception as e:
             logger.error("pipeline_background_error", project_id=project_id, error=str(e))
+            progress_bus.notify(
+                PipelineProgressEvent(
+                    project_id=project_id,
+                    stage="",
+                    status="failed",
+                    error=str(e),
+                )
+            )
             await project_repo.update(project_id, status="failed")
             pipeline_results[project_id] = {
                 "success": False,

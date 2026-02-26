@@ -22,45 +22,59 @@
 
 <!-- Action bar -->
 <div class="page-actions mb-8">
-    <button class="btn btn-primary"
-            hx-post="/api/projects/{{ project.id }}/crawl"
-            hx-swap="none"
-            hx-disabled-elt="this"
-            hx-on::after-request="if(event.detail.successful){showToast('Crawl started','success')}else{showToast('Failed to start crawl')}">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
-        Crawl
-    </button>
-    <button class="btn btn-primary"
-            hx-post="/api/projects/{{ project.id }}/generate"
-            hx-swap="none"
-            hx-disabled-elt="this"
-            hx-on::after-request="if(event.detail.successful){showToast('Test generation started','success')}else{showToast('Failed to generate tests')}">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-        Generate
-    </button>
-    <button class="btn btn-primary"
-            hx-post="/api/projects/{{ project.id }}/run"
-            hx-swap="none"
-            hx-disabled-elt="this"
-            hx-on::after-request="if(event.detail.successful){showToast('Test run started','success')}else{showToast('Failed to run tests')}">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>
-        Run Tests
-    </button>
+    <div id="action-buttons" class="flex flex-wrap items-center gap-2">
+        <button class="btn btn-primary" id="btn-crawl"
+                hx-post="/api/projects/{{ project.id }}/crawl"
+                hx-swap="none"
+                hx-disabled-elt="this"
+                hx-on::after-request="onPipelineTrigger(event, 'Crawl started')">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+            Crawl
+        </button>
+        <button class="btn btn-primary" id="btn-generate"
+                hx-post="/api/projects/{{ project.id }}/generate"
+                hx-swap="none"
+                hx-disabled-elt="this"
+                hx-on::after-request="onPipelineTrigger(event, 'Test generation started')">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            Generate
+        </button>
+        <button class="btn btn-primary" id="btn-run"
+                hx-post="/api/projects/{{ project.id }}/run"
+                hx-swap="none"
+                hx-disabled-elt="this"
+                hx-on::after-request="onPipelineTrigger(event, 'Test run started')">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>
+            Run Tests
+        </button>
 
-    <div class="separator-vertical"></div>
+        <div class="separator-vertical"></div>
 
-    <a href="/projects/{{ project.id }}/suites" class="btn btn-secondary">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-        Suites
-    </a>
-    <a href="/projects/{{ project.id }}/sitemap" class="btn btn-secondary">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-        Mind-Map
-    </a>
-    <a href="/projects/{{ project.id }}/rules" class="btn btn-secondary">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-        Rules
-    </a>
+        <a href="/projects/{{ project.id }}/suites" class="btn btn-secondary">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            Suites
+        </a>
+        <a href="/projects/{{ project.id }}/sitemap" class="btn btn-secondary">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+            Mind-Map
+        </a>
+        <a href="/projects/{{ project.id }}/rules" class="btn btn-secondary">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+            Rules
+        </a>
+    </div>
+
+    <!-- Progress card (hidden until pipeline starts) -->
+    <div id="pipeline-progress" class="pipeline-progress-card hidden">
+        <div class="flex items-center gap-3 mb-3">
+            <svg class="w-4 h-4 animate-spin text-primary" id="progress-spinner" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            <span class="text-[0.8125rem] font-medium text-foreground" id="progress-label">Pipeline running...</span>
+        </div>
+        <div class="stage-steps" id="stage-steps"></div>
+    </div>
 </div>
 
 <!-- Tabs -->
@@ -98,6 +112,143 @@
 <script>
 (function() {
     var PROJECT_ID = "{{ project.id }}";
+    var STAGES = ['crawl', 'map', 'generate', 'run', 'report'];
+    var STAGE_LABELS = { crawl: 'Crawl', map: 'Map', generate: 'Generate', run: 'Run Tests', report: 'Report' };
+    var _es = null;
+    var _esErrCount = 0;
+
+    /* ── Progress card ─────────────────────────────────────────── */
+    function renderStageSteps(activeStage, activeStatus) {
+        var container = document.getElementById('stage-steps');
+        if (!container) return;
+        container.textContent = '';
+        var activeIdx = STAGES.indexOf(activeStage);
+
+        STAGES.forEach(function(stage, idx) {
+            var step = document.createElement('div');
+            step.className = 'stage-step';
+            var dot = document.createElement('span');
+            dot.className = 'stage-dot';
+            var label = document.createElement('span');
+            label.className = 'stage-label';
+            label.textContent = STAGE_LABELS[stage] || stage;
+
+            if (idx < activeIdx || (idx === activeIdx && activeStatus === 'completed')) {
+                dot.classList.add('stage-dot-done');
+                step.classList.add('stage-step-done');
+            } else if (idx === activeIdx && activeStatus === 'failed') {
+                dot.classList.add('stage-dot-failed');
+                step.classList.add('stage-step-failed');
+            } else if (idx === activeIdx && activeStatus === 'started') {
+                dot.classList.add('stage-dot-active');
+                step.classList.add('stage-step-active');
+            } else {
+                dot.classList.add('stage-dot-pending');
+            }
+
+            step.appendChild(dot);
+            step.appendChild(label);
+            container.appendChild(step);
+        });
+    }
+
+    function showProgressCard() {
+        document.getElementById('action-buttons').classList.add('hidden');
+        var card = document.getElementById('pipeline-progress');
+        card.classList.remove('hidden');
+        document.getElementById('progress-label').textContent = 'Pipeline running...';
+        document.getElementById('progress-spinner').classList.remove('hidden');
+    }
+
+    function hideProgressCard() {
+        document.getElementById('pipeline-progress').classList.add('hidden');
+        document.getElementById('action-buttons').classList.remove('hidden');
+    }
+
+    /* ── EventSource lifecycle ──────────────────────────────── */
+    function stopStream() {
+        if (_es) { _es.close(); _es = null; }
+    }
+
+    function startProgressStream() {
+        stopStream();
+        _esErrCount = 0;
+        _es = new EventSource('/api/projects/' + PROJECT_ID + '/progress');
+
+        _es.addEventListener('connected', function(e) {
+            _esErrCount = 0;
+            var data = JSON.parse(e.data);
+            showProgressCard();
+            renderStageSteps(data.stage, data.status);
+            if (data.status === 'started') {
+                document.getElementById('progress-label').textContent =
+                    'Running: ' + (STAGE_LABELS[data.stage] || data.stage) + '...';
+            }
+        });
+
+        _es.addEventListener('stage', function(e) {
+            _esErrCount = 0;
+            var data = JSON.parse(e.data);
+            renderStageSteps(data.stage, data.status);
+            if (data.status === 'started') {
+                document.getElementById('progress-label').textContent =
+                    'Running: ' + (STAGE_LABELS[data.stage] || data.stage) + '...';
+            }
+        });
+
+        _es.addEventListener('done', function() {
+            document.getElementById('progress-label').textContent = 'Pipeline complete!';
+            document.getElementById('progress-spinner').classList.add('hidden');
+            renderStageSteps('report', 'completed');
+            setTimeout(function() {
+                hideProgressCard(); stopStream(); loadTestRuns();
+                sitemapLoaded = false;
+                showToast('Pipeline completed successfully', 'success');
+            }, 1200);
+        });
+
+        _es.addEventListener('failed', function(e) {
+            var data = JSON.parse(e.data);
+            document.getElementById('progress-label').textContent =
+                'Pipeline failed' + (data.stage ? ' at: ' + (STAGE_LABELS[data.stage] || data.stage) : '');
+            document.getElementById('progress-spinner').classList.add('hidden');
+            if (data.stage) renderStageSteps(data.stage, 'failed');
+            setTimeout(function() {
+                hideProgressCard(); stopStream(); loadTestRuns();
+                showToast('Pipeline failed: ' + (data.error || 'unknown error'), 'error');
+            }, 2000);
+        });
+
+        _es.onerror = function() {
+            _esErrCount++;
+            if ((_es && _es.readyState === EventSource.CLOSED) || _esErrCount >= 3) {
+                stopStream();
+                hideProgressCard();
+                showToast('Lost connection to pipeline stream', 'error');
+            }
+        };
+    }
+
+    window.onPipelineTrigger = function(event, successMsg) {
+        if (event.detail.successful) {
+            showToast(successMsg, 'success');
+            showProgressCard();
+            renderStageSteps('crawl', 'started');
+            startProgressStream();
+        } else {
+            showToast('Failed to start pipeline', 'error');
+        }
+    };
+
+    /* ── Resume progress on page load if pipeline is running ── */
+    var projectStatus = "{{ project.status }}";
+    if (projectStatus === 'crawling' || projectStatus === 'running') {
+        showProgressCard();
+        renderStageSteps('crawl', 'started');
+        startProgressStream();
+    }
+
+    window.addEventListener('pagehide', stopStream);
 
     /* ── Tab switching ───────────────────────────────────────── */
     var tabBtns = document.querySelectorAll('.tab-trigger');
@@ -152,6 +303,7 @@
 
     function clearAndAppend(parentId, children) {
         var parent = document.getElementById(parentId);
+        if (!parent) return;
         parent.textContent = '';
         if (!Array.isArray(children)) children = [children];
         children.forEach(function(c) { parent.appendChild(c); });

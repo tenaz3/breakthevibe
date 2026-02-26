@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 import structlog
 
@@ -30,6 +33,7 @@ async def build_pipeline(
     project_id: str,
     url: str,
     rules_yaml: str = "",
+    progress_callback: Callable[[str, str, str], None] | None = None,
 ) -> PipelineOrchestrator:
     """Build a fully-wired pipeline orchestrator with real components."""
     settings = get_settings()
@@ -116,6 +120,7 @@ async def build_pipeline(
         code_builder=code_builder,
         scheduler=scheduler,
         max_retries=rules.get_max_retries(),
+        progress_callback=progress_callback,
     )
 
     logger.info("pipeline_built", project_id=project_id, has_llm=llm is not None)

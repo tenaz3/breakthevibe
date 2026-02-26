@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import contextlib
 import time
 import uuid
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 import structlog
 from structlog.contextvars import bind_contextvars, unbind_contextvars
@@ -56,6 +60,7 @@ class PipelineOrchestrator:
         code_builder: CodeBuilder | None = None,
         scheduler: ParallelScheduler | None = None,
         max_retries: int | None = None,
+        progress_callback: Callable[[str, str, str], None] | None = None,
     ) -> None:
         self._crawler = crawler
         self._mapper = mapper
@@ -67,6 +72,13 @@ class PipelineOrchestrator:
         self._scheduler = scheduler
         # Use explicit max_retries if provided, otherwise default based on planner
         self.max_retries: int = max_retries if max_retries is not None else (3 if planner else 1)
+        self._progress_callback = progress_callback
+
+    def _emit(self, stage: str, status: str, error: str = "") -> None:
+        """Fire progress callback if one is registered."""
+        if self._progress_callback is not None:
+            with contextlib.suppress(Exception):
+                self._progress_callback(stage, status, error)
 
     async def run(
         self,
@@ -108,7 +120,9 @@ class PipelineOrchestrator:
             for attempt in range(self.max_retries):
                 try:
                     logger.info("stage_starting", stage=stage.value, attempt=attempt + 1)
+                    self._emit(stage.value, "started")
                     await handler(context)
+                    self._emit(stage.value, "completed")
                     completed.append(stage)
                     success = True
                     break
@@ -145,6 +159,7 @@ class PipelineOrchestrator:
                             )
 
             if not success:
+                self._emit(stage.value, "failed", last_error)
                 duration = time.monotonic() - start
                 logger.error("pipeline_failed", stage=stage.value, error=last_error)
                 unbind_contextvars("pipeline_run_id", "pipeline_project_id")
@@ -158,6 +173,7 @@ class PipelineOrchestrator:
                     duration_seconds=duration,
                 )
 
+        self._emit("", "done")
         duration = time.monotonic() - start
         logger.info("pipeline_completed", run_id=run_id, duration=duration)
         unbind_contextvars("pipeline_run_id", "pipeline_project_id")

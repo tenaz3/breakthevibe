@@ -25,6 +25,7 @@ from breakthevibe.web.routes.pages import router as pages_router
 from breakthevibe.web.routes.projects import router as projects_router
 from breakthevibe.web.routes.results import router as results_router
 from breakthevibe.web.routes.settings import router as settings_router
+from breakthevibe.web.routes.sse import router as sse_router
 from breakthevibe.web.routes.tests import router as tests_router
 
 logger = structlog.get_logger(__name__)
@@ -74,7 +75,14 @@ def create_app() -> FastAPI:
         return {"status": "healthy", "version": "0.1.0"}
 
     # Protected routes (require session auth — API returns 401, pages redirect to /login)
-    protected = [projects_router, crawl_router, tests_router, results_router, settings_router]
+    protected = [
+        projects_router,
+        crawl_router,
+        tests_router,
+        results_router,
+        settings_router,
+        sse_router,
+    ]
     for router in protected:
         app.include_router(router, dependencies=[Depends(require_auth)])
 

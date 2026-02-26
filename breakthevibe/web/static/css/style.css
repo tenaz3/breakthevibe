@@ -65,6 +65,10 @@
     --input-focus-ring: rgba(79, 93, 214, 0.15);
     --destructive-hover: #d32f2f;
 
+    /* Pipeline progress — light */
+    --primary-ring: rgba(79, 93, 214, 0.2);
+    --primary-ring-wide: rgba(79, 93, 214, 0.1);
+
     /* Misc — light */
     --empty-icon: #c0c0cc;
     --empty-subtitle: #8e8ea0;
@@ -132,6 +136,10 @@
     --input-focus-border: #52525b;
     --input-focus-ring: rgba(96, 112, 239, 0.15);
     --destructive-hover: #dc2626;
+
+    /* Pipeline progress — dark */
+    --primary-ring: rgba(96, 112, 239, 0.2);
+    --primary-ring-wide: rgba(96, 112, 239, 0.1);
 
     /* Misc — dark */
     --empty-icon: #3f3f46;
@@ -888,6 +896,82 @@ fieldset.field-group legend {
 .focus-ring:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+}
+
+/* ─── Pipeline Progress Card ────────────────────────────────── */
+.pipeline-progress-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    width: 100%;
+}
+
+.stage-steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+}
+
+.stage-step {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-shrink: 0;
+}
+
+.stage-step + .stage-step::before {
+    content: '';
+    display: block;
+    width: 2rem;
+    height: 2px;
+    background: var(--border);
+    flex-shrink: 0;
+    margin-right: 0.375rem;
+}
+
+.stage-step-done + .stage-step:not(.stage-step-failed)::before {
+    background: var(--success);
+}
+
+.stage-dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.stage-dot-pending { background: var(--border); }
+
+.stage-dot-active {
+    background: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-ring);
+    animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+.stage-dot-done { background: var(--success); }
+
+.stage-dot-failed { background: var(--destructive); }
+
+.stage-label {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+}
+
+.stage-step-active .stage-label {
+    color: var(--foreground);
+    font-weight: 500;
+}
+
+.stage-step-done .stage-label { color: var(--success); }
+
+.stage-step-failed .stage-label { color: var(--destructive); }
+
+@keyframes pulse-dot {
+    0%, 100% { box-shadow: 0 0 0 3px var(--primary-ring); }
+    50% { box-shadow: 0 0 0 5px var(--primary-ring-wide); }
 }
 
 /* ─── Responsive ────────────────────────────────────────────── */
