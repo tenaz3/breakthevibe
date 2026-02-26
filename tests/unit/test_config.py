@@ -8,6 +8,7 @@ class TestSettings:
     def test_default_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
         monkeypatch.setenv("SECRET_KEY", "test-secret")
+        monkeypatch.setenv("DEBUG", "false")
         settings = Settings()
         assert settings.debug is False
         assert settings.log_level == "INFO"

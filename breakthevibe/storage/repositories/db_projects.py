@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from sqlmodel import delete, select
+from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
@@ -77,28 +77,26 @@ class DatabaseProjectRepository:
 
             # Delete child rows that reference this project (no DB cascade)
             run_ids_result = await session.execute(
-                select(TestRun.id).where(TestRun.project_id == pid)
+                select(TestRun.id).where(col(TestRun.project_id) == pid)
             )
             run_ids = [r for (r,) in run_ids_result.all()]
             if run_ids:
                 await session.execute(
-                    delete(TestResult).where(TestResult.test_run_id.in_(run_ids))  # type: ignore[union-attr]
+                    delete(TestResult).where(col(TestResult.test_run_id).in_(run_ids))
                 )
-                await session.execute(delete(TestRun).where(TestRun.project_id == pid))
+                await session.execute(delete(TestRun).where(col(TestRun.project_id) == pid))
 
-            await session.execute(delete(TestCase).where(TestCase.project_id == pid))
+            await session.execute(delete(TestCase).where(col(TestCase.project_id) == pid))
 
             crawl_ids_result = await session.execute(
-                select(CrawlRun.id).where(CrawlRun.project_id == pid)
+                select(CrawlRun.id).where(col(CrawlRun.project_id) == pid)
             )
             crawl_ids = [r for (r,) in crawl_ids_result.all()]
             if crawl_ids:
                 from breakthevibe.models.database import Route
 
-                await session.execute(
-                    delete(Route).where(Route.crawl_run_id.in_(crawl_ids))  # type: ignore[union-attr]
-                )
-                await session.execute(delete(CrawlRun).where(CrawlRun.project_id == pid))
+                await session.execute(delete(Route).where(col(Route.crawl_run_id).in_(crawl_ids)))
+                await session.execute(delete(CrawlRun).where(col(CrawlRun.project_id) == pid))
 
             await session.delete(project)
             await session.commit()
