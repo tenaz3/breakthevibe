@@ -9,7 +9,7 @@
 </div>
 
 <form id="new-project-form" style="display:none" class="card"
-      hx-post="/api/projects" hx-target="#project-grid" hx-swap="beforeend"
+      hx-post="/api/projects" hx-target="#project-grid" hx-swap="beforeend" hx-ext="json-enc"
       hx-on::after-request="this.reset(); this.style.display='none'; location.reload()">
     <h3>Create Project</h3>
     <label>Name <input type="text" name="name" required minlength="1"></label>

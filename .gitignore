@@ -14,3 +14,8 @@ htmlcov/
 artifacts/
 videos/
 screenshots/
+*.png
+*.jpg
+*.jpeg
+*.gif
+.playwright-mcp/
