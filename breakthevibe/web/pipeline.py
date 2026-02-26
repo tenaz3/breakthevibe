@@ -26,7 +26,7 @@ from breakthevibe.storage.artifacts import ArtifactStore
 logger = structlog.get_logger(__name__)
 
 
-def build_pipeline(
+async def build_pipeline(
     project_id: str,
     url: str,
     rules_yaml: str = "",
@@ -46,18 +46,9 @@ def build_pipeline(
 
     llm_settings: dict[str, Any] = {}
     try:
-        import asyncio
-
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            import concurrent.futures
-
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                llm_settings = pool.submit(asyncio.run, llm_settings_repo.get_all()).result()
-        else:
-            llm_settings = loop.run_until_complete(llm_settings_repo.get_all())
-    except Exception:  # nosec B110
-        pass
+        llm_settings = await llm_settings_repo.get_all()
+    except (OSError, ValueError, KeyError):
+        logger.warning("llm_settings_load_failed")
 
     def _resolve_llm(module_name: str | None = None) -> Any:
         """Resolve LLM provider for a module, checking DB settings then env."""

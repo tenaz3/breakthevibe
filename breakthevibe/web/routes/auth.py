@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import structlog
 from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from breakthevibe.web.auth.session import get_session_auth
@@ -11,6 +15,18 @@ from breakthevibe.web.auth.session import get_session_auth
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["auth"])
+templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
+
+
+@router.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request) -> HTMLResponse:
+    """Render the login page."""
+    # If already authenticated, redirect to home
+    auth = get_session_auth()
+    token = request.cookies.get("session")
+    if token and auth.validate_session(token):
+        return RedirectResponse(url="/", status_code=302)  # type: ignore[return-value]
+    return templates.TemplateResponse("login.html", {"request": request})
 
 
 class LoginRequest(BaseModel):
@@ -45,6 +61,7 @@ async def login(body: LoginRequest, response: Response) -> dict[str, str]:
         key="session",
         value=token,
         httponly=True,
+        secure=not settings.debug,
         samesite="lax",
         max_age=86400,
     )

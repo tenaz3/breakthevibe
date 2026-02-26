@@ -39,6 +39,7 @@ class PipelineResult:
     error_message: str = ""
     duration_seconds: float = 0.0
     report: Any = None  # TestRunReport from ResultCollector
+    sitemap: Any = None  # SiteMap from MindMapBuilder
 
 
 class PipelineOrchestrator:
@@ -167,6 +168,7 @@ class PipelineOrchestrator:
             completed_stages=completed,
             duration_seconds=duration,
             report=context.get("report"),
+            sitemap=context.get("sitemap"),
         )
 
     async def _run_crawl(self, context: dict[str, Any]) -> None:
@@ -198,8 +200,13 @@ class PipelineOrchestrator:
                 from breakthevibe.storage.database import get_engine
 
                 async with AsyncSession(get_engine()) as session:
+                    try:
+                        pid = int(context["project_id"])
+                    except (ValueError, TypeError):
+                        logger.warning("invalid_project_id", project_id=context["project_id"])
+                        return
                     crawl_run = CrawlRun(
-                        project_id=int(context["project_id"]),
+                        project_id=pid,
                         status="completed",
                         site_map_json=result.model_dump_json(),
                     )

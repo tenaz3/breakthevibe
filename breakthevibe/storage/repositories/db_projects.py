@@ -5,13 +5,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from sqlmodel import select
+from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
 
-from breakthevibe.models.database import Project
+from breakthevibe.models.database import CrawlRun, Project, TestCase, TestResult, TestRun
 
 logger = structlog.get_logger(__name__)
 
@@ -55,25 +55,63 @@ class DatabaseProjectRepository:
             return [self._to_dict(p) for p in results.scalars().all()]
 
     async def get(self, project_id: str) -> dict[str, Any] | None:
+        try:
+            pid = int(project_id)
+        except (ValueError, TypeError):
+            return None
         async with AsyncSession(self._engine) as session:
-            project = await session.get(Project, int(project_id))
+            project = await session.get(Project, pid)
             if not project:
                 return None
             return self._to_dict(project)
 
     async def delete(self, project_id: str) -> bool:
+        try:
+            pid = int(project_id)
+        except (ValueError, TypeError):
+            return False
         async with AsyncSession(self._engine) as session:
-            project = await session.get(Project, int(project_id))
+            project = await session.get(Project, pid)
             if not project:
                 return False
+
+            # Delete child rows that reference this project (no DB cascade)
+            run_ids_result = await session.execute(
+                select(TestRun.id).where(TestRun.project_id == pid)
+            )
+            run_ids = [r for (r,) in run_ids_result.all()]
+            if run_ids:
+                await session.execute(
+                    delete(TestResult).where(TestResult.test_run_id.in_(run_ids))  # type: ignore[union-attr]
+                )
+                await session.execute(delete(TestRun).where(TestRun.project_id == pid))
+
+            await session.execute(delete(TestCase).where(TestCase.project_id == pid))
+
+            crawl_ids_result = await session.execute(
+                select(CrawlRun.id).where(CrawlRun.project_id == pid)
+            )
+            crawl_ids = [r for (r,) in crawl_ids_result.all()]
+            if crawl_ids:
+                from breakthevibe.models.database import Route
+
+                await session.execute(
+                    delete(Route).where(Route.crawl_run_id.in_(crawl_ids))  # type: ignore[union-attr]
+                )
+                await session.execute(delete(CrawlRun).where(CrawlRun.project_id == pid))
+
             await session.delete(project)
             await session.commit()
             logger.info("project_deleted", id=project_id)
             return True
 
     async def update(self, project_id: str, **updates: Any) -> dict[str, Any] | None:
+        try:
+            pid = int(project_id)
+        except (ValueError, TypeError):
+            return None
         async with AsyncSession(self._engine) as session:
-            project = await session.get(Project, int(project_id))
+            project = await session.get(Project, pid)
             if not project:
                 return None
             if "name" in updates:

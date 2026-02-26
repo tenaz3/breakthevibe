@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
+from urllib.parse import quote
 
 import structlog
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+if TYPE_CHECKING:
+    from fastapi.exceptions import HTTPException
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from breakthevibe.config.logging import setup_logging
@@ -35,13 +41,26 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
+    # Redirect 401s to /login for browser page requests; return JSON for API
+    @app.exception_handler(401)
+    async def auth_redirect_handler(
+        request: Request, exc: HTTPException
+    ) -> RedirectResponse | JSONResponse:
+        if not request.url.path.startswith("/api/"):
+            next_url = quote(str(request.url.path), safe="/")
+            return RedirectResponse(url=f"/login?next={next_url}")
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+
     # Middleware (order matters — last added runs first)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE"],
-        allow_headers=["*"],
+        allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
     )
     app.add_middleware(RateLimitMiddleware, max_requests=60, window_seconds=60)
     app.add_middleware(RequestIDMiddleware)
@@ -54,13 +73,13 @@ def create_app() -> FastAPI:
     async def health_check() -> dict[str, str]:
         return {"status": "healthy", "version": "0.1.0"}
 
-    # Protected API routes (require session auth)
+    # Protected routes (require session auth — API returns 401, pages redirect to /login)
     protected = [projects_router, crawl_router, tests_router, results_router, settings_router]
     for router in protected:
         app.include_router(router, dependencies=[Depends(require_auth)])
 
-    # Page routes (HTML — auth enforced per-route for flexibility)
-    app.include_router(pages_router)
+    # Page routes (also protected)
+    app.include_router(pages_router, dependencies=[Depends(require_auth)])
 
     # Mount static files if directory exists
     static_dir = Path(__file__).parent / "static"

@@ -7,7 +7,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
-from breakthevibe.web.dependencies import project_repo, run_pipeline
+from breakthevibe.web.dependencies import pipeline_results, project_repo, run_pipeline
 
 logger = structlog.get_logger(__name__)
 
@@ -37,8 +37,9 @@ async def get_sitemap(project_id: str) -> dict[str, Any]:
     project = await project_repo.get(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    # Return cached sitemap if available
-    sitemap = project.get("sitemap", {})
+    # Read sitemap from pipeline results cache (populated after crawl completes)
+    result = pipeline_results.get(project_id, {})
+    sitemap = result.get("sitemap", {})
     return {
         "project_id": project_id,
         "pages": sitemap.get("pages", []),
