@@ -19,7 +19,7 @@ def is_safe_url(url: str) -> bool:
         return False
 
     # Block localhost variants
-    if hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+    if hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):  # nosec B104
         return False
 
     # Block private IP ranges

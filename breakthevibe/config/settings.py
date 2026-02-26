@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return cached settings instance."""
     settings = Settings()
-    if settings.secret_key == "change-me-in-production":
+    if settings.secret_key == "change-me-in-production":  # nosec B105
         warnings.warn(
             "SECRET_KEY is using the insecure default. "
             "Set SECRET_KEY environment variable for production.",

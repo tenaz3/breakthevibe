@@ -287,7 +287,7 @@ class Crawler:
                         await page.wait_for_timeout(self._after_click_wait)
                         logger.debug("cookie_banner_dismissed", selector=selector)
                         break
-                except Exception:
+                except Exception:  # nosec B112
                     continue
 
         # Close modals
@@ -304,7 +304,7 @@ class Crawler:
                         await page.wait_for_timeout(self._after_click_wait)
                         logger.debug("modal_closed", selector=selector)
                         break
-                except Exception:
+                except Exception:  # nosec B112
                     continue
 
     async def _click_interactive_elements(
@@ -347,7 +347,7 @@ class Crawler:
                                     f"before_click_{click_index}",
                                     ss_data,
                                 )
-                            except Exception:
+                            except Exception:  # nosec B110
                                 pass
 
                         await link.click(timeout=2000)
@@ -363,16 +363,16 @@ class Crawler:
                                     f"after_click_{click_index}",
                                     ss_data,
                                 )
-                            except Exception:
+                            except Exception:  # nosec B110
                                 pass
 
                         click_index += 1
                         # Navigate back for the next click
                         await page.go_back(timeout=self._page_load_timeout)
                         await page.wait_for_timeout(self._after_click_wait)
-                    except Exception:
+                    except Exception:  # nosec B112
                         continue
-            except Exception:
+            except Exception:  # nosec B112
                 continue
 
     async def _scroll_for_content(self, page: Page) -> None:

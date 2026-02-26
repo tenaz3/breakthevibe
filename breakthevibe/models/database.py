@@ -1,13 +1,13 @@
 """SQLModel database table models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
 
 def _utc_now() -> datetime:
     """Return current UTC time as naive datetime for TIMESTAMP WITHOUT TIME ZONE columns."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class Project(SQLModel, table=True):

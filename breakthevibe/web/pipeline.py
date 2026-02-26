@@ -56,7 +56,7 @@ def build_pipeline(
                 llm_settings = pool.submit(asyncio.run, llm_settings_repo.get_all()).result()
         else:
             llm_settings = loop.run_until_complete(llm_settings_repo.get_all())
-    except Exception:
+    except Exception:  # nosec B110
         pass
 
     def _resolve_llm(module_name: str | None = None) -> Any:
