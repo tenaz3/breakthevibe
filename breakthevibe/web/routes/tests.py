@@ -13,7 +13,7 @@ router = APIRouter(tags=["tests"])
 
 
 @router.post("/api/projects/{project_id}/generate")
-async def trigger_generate(project_id: str, background_tasks: BackgroundTasks) -> dict:
+async def trigger_generate(project_id: str, background_tasks: BackgroundTasks) -> dict[str, str]:
     project = await project_repo.get(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -34,7 +34,7 @@ async def trigger_generate(project_id: str, background_tasks: BackgroundTasks) -
 
 
 @router.post("/api/projects/{project_id}/run")
-async def trigger_run(project_id: str, background_tasks: BackgroundTasks) -> dict:
+async def trigger_run(project_id: str, background_tasks: BackgroundTasks) -> dict[str, str]:
     project = await project_repo.get(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")

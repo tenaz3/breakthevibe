@@ -7,7 +7,7 @@ import json
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -23,7 +23,7 @@ class StepCapture:
 
     name: str
     screenshot_path: str | None = None
-    network_calls: list[dict] = field(default_factory=list)
+    network_calls: list[dict[str, Any]] = field(default_factory=list)
     console_logs: list[str] = field(default_factory=list)
 
 

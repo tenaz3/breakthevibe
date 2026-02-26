@@ -151,7 +151,8 @@ class TestCaseGenerator:
         except json.JSONDecodeError:
             logger.warning("llm_response_parse_error", content=content[:200])
             return []
-        return data.get("test_cases", [])
+        cases: list[dict[str, Any]] = data.get("test_cases", [])
+        return cases
 
     def _build_test_case(
         self, raw: dict[str, Any], component_map: dict[str, ComponentInfo] | None = None

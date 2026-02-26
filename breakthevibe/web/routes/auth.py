@@ -19,7 +19,7 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/api/auth/login")
-async def login(body: LoginRequest, response: Response) -> dict:
+async def login(body: LoginRequest, response: Response) -> dict[str, str]:
     """Create a session for the user.
 
     When ADMIN_USERNAME/ADMIN_PASSWORD are set, validates credentials.
@@ -53,7 +53,7 @@ async def login(body: LoginRequest, response: Response) -> dict:
 
 
 @router.post("/api/auth/logout")
-async def logout(request: Request, response: Response) -> dict:
+async def logout(request: Request, response: Response) -> dict[str, str]:
     """Destroy the current session."""
     auth = get_session_auth()
     token = request.cookies.get("session")

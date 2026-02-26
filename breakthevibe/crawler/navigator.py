@@ -1,7 +1,6 @@
 """SPA-aware page navigator for crawling websites."""
 
 import fnmatch
-from typing import Any
 from urllib.parse import urlparse
 
 from playwright.async_api import Page
@@ -108,12 +107,13 @@ class Navigator:
         """Install JavaScript listener for SPA route changes."""
         await page.evaluate(INSTALL_SPA_LISTENER_JS)
 
-    async def get_spa_route_changes(self, page: Page) -> list[Any]:
+    async def get_spa_route_changes(self, page: Page) -> list[str]:
         """Get any SPA route changes that occurred since last check."""
-        return await page.evaluate(
+        result: list[str] = await page.evaluate(
             "() => { const c = window.__btv_route_changes || [];"
             " window.__btv_route_changes = []; return c; }"
         )
+        return result
 
     async def get_current_url(self, page: Page) -> str:
         """Get the current page URL."""

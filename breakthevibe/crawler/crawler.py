@@ -136,7 +136,7 @@ class Crawler:
                 # Assign video path from Playwright (#7)
                 if video_obj:
                     with contextlib.suppress(Exception):
-                        page_data.video_path = await video_obj.path()
+                        page_data.video_path = str(await video_obj.path())
 
                 pages.append(page_data)
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
@@ -74,7 +75,7 @@ async def test_suites_page(request: Request, project_id: str, category: str = ""
     suites = result.get("suites", [])
 
     # Group suites by route, optionally filtering by category
-    suites_by_route: dict[str, list[dict]] = {}
+    suites_by_route: dict[str, list[dict[str, Any]]] = {}
     for s in suites:
         suite_name: str = s.get("name", "unknown")
         # Infer category from suite name suffix (e.g., "home_functional" -> "functional")
@@ -107,7 +108,7 @@ async def test_suites_page(request: Request, project_id: str, category: str = ""
 @router.get("/runs/{run_id}", response_class=HTMLResponse)
 async def test_result_detail_page(request: Request, run_id: str) -> HTMLResponse:
     # Find the result matching this run_id
-    result: dict = {}
+    result: dict[str, Any] = {}
     for _pid, res in pipeline_results.items():
         if res.get("run_id") == run_id:
             result = res

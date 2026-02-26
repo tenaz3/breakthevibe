@@ -73,13 +73,13 @@ class VisualDiff:
 
         for y in range(height):
             for x in range(width):
-                bp = baseline_pixels[x, y]
-                cp = current_pixels[x, y]
+                bp: tuple[int, int, int] = baseline_pixels[x, y]  # type: ignore[assignment,index]
+                cp: tuple[int, int, int] = current_pixels[x, y]  # type: ignore[assignment,index]
                 if bp != cp:
                     diff_count += 1
-                    if diff_pixels:
+                    if diff_pixels is not None:
                         diff_pixels[x, y] = (255, 0, 255)  # Magenta for diffs
-                elif diff_pixels:
+                elif diff_pixels is not None:
                     r, g, b = bp
                     diff_pixels[x, y] = (r // 3, g // 3, b // 3)
 

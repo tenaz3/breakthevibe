@@ -46,4 +46,4 @@ class BrowserManager:
         if self._browser:
             await self._browser.close()
         if self._playwright:
-            await self._playwright.__aexit__(None, None, None)
+            await self._playwright.stop()

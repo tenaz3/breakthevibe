@@ -51,7 +51,7 @@ def create_app() -> FastAPI:
 
     # Health check (public)
     @app.get("/api/health")
-    async def health_check() -> dict:
+    async def health_check() -> dict[str, str]:
         return {"status": "healthy", "version": "0.1.0"}
 
     # Protected API routes (require session auth)

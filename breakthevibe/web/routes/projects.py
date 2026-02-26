@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, HttpUrl
@@ -31,7 +33,7 @@ class ProjectResponse(BaseModel):
 
 
 @router.post("", status_code=201, response_model=ProjectResponse)
-async def create_project(body: CreateProjectRequest) -> dict:
+async def create_project(body: CreateProjectRequest) -> dict[str, Any]:
     # SSRF protection (#14)
     if not is_safe_url(str(body.url)):
         raise HTTPException(status_code=422, detail="URL targets a private or reserved IP address")
@@ -44,12 +46,12 @@ async def create_project(body: CreateProjectRequest) -> dict:
 
 
 @router.get("", response_model=list[ProjectResponse])
-async def list_projects() -> list:
+async def list_projects() -> list[dict[str, Any]]:
     return await project_repo.list_all()
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
-async def get_project(project_id: str) -> dict:
+async def get_project(project_id: str) -> dict[str, Any]:
     project = await project_repo.get(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")

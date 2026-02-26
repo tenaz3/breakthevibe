@@ -93,4 +93,5 @@ class RulesConfig(BaseModel):
         data = self.model_dump()
         # Flatten inputs back to simple dict
         data["inputs"] = data["inputs"]["values"]
-        return yaml.dump(data, default_flow_style=False, sort_keys=False)
+        result: str = yaml.dump(data, default_flow_style=False, sort_keys=False)
+        return result

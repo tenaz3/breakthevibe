@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from openai import AsyncOpenAI
 
 from breakthevibe.exceptions import LLMProviderError
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessageParam
 from breakthevibe.llm.provider import LLMProviderBase, LLMResponse
 
 
@@ -21,7 +24,7 @@ class OpenAIProvider(LLMProviderBase):
         self, prompt: str, system: str | None = None, max_tokens: int = 4096
     ) -> LLMResponse:
         """Generate a text response from OpenAI."""
-        messages: list[dict[str, Any]] = []
+        messages: list[ChatCompletionMessageParam] = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})

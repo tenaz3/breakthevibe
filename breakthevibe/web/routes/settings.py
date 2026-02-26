@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request
@@ -40,7 +41,7 @@ async def rules_editor_page(request: Request, project_id: str) -> HTMLResponse:
 
 
 @router.put("/api/projects/{project_id}/rules")
-async def update_rules(project_id: str, request: Request) -> dict:
+async def update_rules(project_id: str, request: Request) -> dict[str, str]:
     project = await project_repo.get(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -55,7 +56,7 @@ async def update_rules(project_id: str, request: Request) -> dict:
 
 
 @router.post("/api/rules/validate")
-async def validate_rules(body: ValidateRulesRequest) -> dict:
+async def validate_rules(body: ValidateRulesRequest) -> dict[str, str | bool]:
     try:
         RulesConfig.from_yaml(body.yaml)
         return {"valid": True}
@@ -72,9 +73,9 @@ async def llm_settings_page(request: Request) -> HTMLResponse:
 
 
 @router.put("/api/settings/llm")
-async def update_llm_settings(request: Request) -> dict:
+async def update_llm_settings(request: Request) -> dict[str, str]:
     form = await request.form()
-    updates: dict[str, str] = {}
+    updates: dict[str, Any] = {}
     if form.get("default_provider"):
         updates["default_provider"] = str(form["default_provider"])
     if form.get("default_model"):
@@ -98,7 +99,7 @@ async def update_llm_settings(request: Request) -> dict:
             modules.setdefault(module, {})["provider"] = str(provider)
         if model:
             modules.setdefault(module, {})["model"] = str(model)
-    updates["modules"] = modules  # type: ignore[assignment]
+    updates["modules"] = modules
 
     await llm_settings_repo.set_many(updates)
     logger.info("llm_settings_updated")

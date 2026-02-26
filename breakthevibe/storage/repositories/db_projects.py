@@ -50,7 +50,7 @@ class DatabaseProjectRepository:
 
     async def list_all(self) -> list[dict[str, Any]]:
         async with AsyncSession(self._engine) as session:
-            statement = select(Project).order_by(Project.created_at.desc())
+            statement = select(Project).order_by(Project.created_at.desc())  # type: ignore[attr-defined]
             results = await session.execute(statement)
             return [self._to_dict(p) for p in results.scalars().all()]
 

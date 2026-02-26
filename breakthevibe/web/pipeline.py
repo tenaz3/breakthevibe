@@ -44,11 +44,18 @@ def build_pipeline(
     # LLM provider — check per-module settings from DB first, fall back to env vars
     from breakthevibe.web.dependencies import llm_settings_repo
 
-    llm_settings: dict = {}
+    llm_settings: dict[str, Any] = {}
     try:
         import asyncio
 
-        llm_settings = asyncio.get_event_loop().run_until_complete(llm_settings_repo.get_all())
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                llm_settings = pool.submit(asyncio.run, llm_settings_repo.get_all()).result()
+        else:
+            llm_settings = loop.run_until_complete(llm_settings_repo.get_all())
     except Exception:
         pass
 

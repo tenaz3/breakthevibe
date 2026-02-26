@@ -67,7 +67,7 @@ class ComponentExtractor:
         """Extract all meaningful components via DOM analysis + accessibility snapshot (#15)."""
         # Playwright accessibility tree for richer semantic structure
         try:
-            self._a11y_snapshot = await page.accessibility.snapshot()  # type: ignore[union-attr]
+            self._a11y_snapshot = await page.accessibility.snapshot()  # type: ignore[attr-defined]
         except Exception:
             self._a11y_snapshot = None
 

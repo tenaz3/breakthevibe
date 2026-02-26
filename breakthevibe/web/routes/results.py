@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
 from fastapi import APIRouter
 
@@ -13,7 +15,7 @@ router = APIRouter(tags=["results"])
 
 
 @router.get("/api/runs/{run_id}/results")
-async def get_run_results(run_id: str) -> dict:
+async def get_run_results(run_id: str) -> dict[str, Any]:
     # Search through pipeline results for matching run_id
     for _project_id, result in pipeline_results.items():
         if result.get("run_id") == run_id:
@@ -37,7 +39,7 @@ async def get_run_results(run_id: str) -> dict:
 
 
 @router.get("/api/projects/{project_id}/results")
-async def get_project_results(project_id: str) -> dict:
+async def get_project_results(project_id: str) -> dict[str, Any]:
     result = pipeline_results.get(project_id)
     if not result:
         return {"project_id": project_id, "status": "no_runs"}

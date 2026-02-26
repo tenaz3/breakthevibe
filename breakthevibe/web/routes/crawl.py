@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
@@ -13,7 +15,7 @@ router = APIRouter(tags=["crawl"])
 
 
 @router.post("/api/projects/{project_id}/crawl")
-async def trigger_crawl(project_id: str, background_tasks: BackgroundTasks) -> dict:
+async def trigger_crawl(project_id: str, background_tasks: BackgroundTasks) -> dict[str, str]:
     project = await project_repo.get(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -31,7 +33,7 @@ async def trigger_crawl(project_id: str, background_tasks: BackgroundTasks) -> d
 
 
 @router.get("/api/projects/{project_id}/sitemap")
-async def get_sitemap(project_id: str) -> dict:
+async def get_sitemap(project_id: str) -> dict[str, Any]:
     project = await project_repo.get(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")

@@ -56,7 +56,8 @@ class ComponentClassifier:
 
         try:
             result = json.loads(response.content)
-            return result.get("groups", [])
+            groups: list[dict[str, Any]] = result.get("groups", [])
+            return groups
         except json.JSONDecodeError:
             logger.warning("llm_classification_parse_error", page_url=page_url)
             return []
