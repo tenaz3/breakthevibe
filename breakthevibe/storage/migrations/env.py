@@ -16,9 +16,11 @@ from breakthevibe.models.database import (  # noqa: F401
     OrganizationMembership,
     Project,
     Route,
+    Subscription,
     TestCase,
     TestResult,
     TestRun,
+    UsageRecord,
     User,
 )
 

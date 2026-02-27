@@ -155,6 +155,38 @@ class TestResult(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utc_now)
 
 
+# ---------------------------------------------------------------------------
+# Billing models
+# ---------------------------------------------------------------------------
+
+
+class Subscription(SQLModel, table=True):
+    __tablename__ = "subscriptions"
+
+    id: str = Field(default_factory=_new_uuid, primary_key=True)
+    org_id: str = Field(foreign_key="organizations.id", unique=True, index=True)
+    plan: str = Field(default="free")  # free | starter | pro
+    status: str = Field(default="active")  # active | canceled | past_due
+    stripe_customer_id: str | None = None
+    stripe_subscription_id: str | None = None
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
+
+
+class UsageRecord(SQLModel, table=True):
+    __tablename__ = "usage_records"
+
+    id: int | None = Field(default=None, primary_key=True)
+    org_id: str = Field(index=True)
+    metric: str = Field(index=True)  # projects | crawls | test_runs | storage_bytes
+    period: str  # YYYY-MM format
+    count: int = Field(default=0)
+    created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
+
+
 class LlmSetting(SQLModel, table=True):
     __tablename__ = "llm_settings"
 
