@@ -57,9 +57,7 @@ class LocalObjectStore(ObjectStore):
             return []
 
         def _list() -> list[str]:
-            return sorted(
-                str(f.relative_to(self._base)) for f in base.rglob("*") if f.is_file()
-            )
+            return sorted(str(f.relative_to(self._base)) for f in base.rglob("*") if f.is_file())
 
         return await asyncio.to_thread(_list)
 

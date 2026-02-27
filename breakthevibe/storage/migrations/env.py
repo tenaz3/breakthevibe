@@ -14,6 +14,7 @@ from breakthevibe.models.database import (  # noqa: F401
     LlmSetting,
     Organization,
     OrganizationMembership,
+    PipelineJob,
     Project,
     Route,
     Subscription,

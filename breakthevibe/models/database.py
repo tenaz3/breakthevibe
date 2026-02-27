@@ -187,6 +187,27 @@ class UsageRecord(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=_utc_now)
 
 
+# ---------------------------------------------------------------------------
+# Pipeline job queue
+# ---------------------------------------------------------------------------
+
+
+class PipelineJob(SQLModel, table=True):
+    __tablename__ = "pipeline_jobs"
+
+    id: str = Field(default_factory=_new_uuid, primary_key=True)
+    org_id: str = Field(index=True)
+    project_id: str
+    job_type: str = Field(default="full")  # full | crawl | generate | run
+    status: str = Field(default="pending")  # pending | running | completed | failed | canceled
+    url: str = ""
+    rules_yaml: str = ""
+    error_message: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    created_at: datetime = Field(default_factory=_utc_now)
+
+
 class LlmSetting(SQLModel, table=True):
     __tablename__ = "llm_settings"
 

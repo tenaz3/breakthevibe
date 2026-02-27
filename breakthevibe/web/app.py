@@ -21,6 +21,7 @@ from breakthevibe.web.auth.session import require_auth
 from breakthevibe.web.middleware import RateLimitMiddleware, RequestIDMiddleware
 from breakthevibe.web.routes.auth import router as auth_router
 from breakthevibe.web.routes.crawl import router as crawl_router
+from breakthevibe.web.routes.jobs import router as jobs_router
 from breakthevibe.web.routes.pages import router as pages_router
 from breakthevibe.web.routes.projects import router as projects_router
 from breakthevibe.web.routes.results import router as results_router
@@ -91,6 +92,7 @@ def create_app() -> FastAPI:
         tests_router,
         results_router,
         settings_router,
+        jobs_router,
         sse_router,
     ]
     for router in protected:
