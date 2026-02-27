@@ -17,6 +17,12 @@ var MODEL_OPTIONS = {
         { value: "o3-mini", label: "o3-mini" },
         { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
     ],
+    gemini: [
+        { value: "gemini-2.5-pro-preview-06-05", label: "Gemini 2.5 Pro" },
+        { value: "gemini-2.5-flash-preview-05-20", label: "Gemini 2.5 Flash" },
+        { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+        { value: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash Lite" },
+    ],
     ollama: [
         { value: "llama3.1", label: "Llama 3.1" },
         { value: "llama3.2", label: "Llama 3.2" },
@@ -79,8 +85,9 @@ document.addEventListener('DOMContentLoaded', function() {
     <h1>LLM Settings</h1>
 </div>
 
-<form hx-put="/api/settings/llm" hx-swap="none"
-      hx-on::after-request="if(event.detail.successful){showToast('Settings saved','success')}else{showToast('Failed to save settings')}"
+<form id="llm-settings-form" hx-put="/api/settings/llm" hx-swap="none"
+      hx-on::before-request="setSaveState('saving')"
+      hx-on::after-request="if(event.detail.successful){setSaveState('saved');showToast('Settings saved','success')}else{setSaveState('idle');showToast('Failed to save settings')}"
       enctype="application/x-www-form-urlencoded"
       class="space-y-4 max-w-2xl">
 
@@ -95,6 +102,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <select id="default-provider" name="default_provider" class="select">
                     <option value="anthropic" {% if settings.default_provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
                     <option value="openai" {% if settings.default_provider == 'openai' %}selected{% endif %}>OpenAI</option>
+                    <option value="gemini" {% if settings.default_provider == 'gemini' %}selected{% endif %}>Google Gemini</option>
                     <option value="ollama" {% if settings.default_provider == 'ollama' %}selected{% endif %}>Ollama</option>
                 </select>
             </div>
@@ -121,6 +129,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <option value="">Use default</option>
                             <option value="anthropic" {% if settings.modules[module].provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
                             <option value="openai" {% if settings.modules[module].provider == 'openai' %}selected{% endif %}>OpenAI</option>
+                            <option value="gemini" {% if settings.modules[module].provider == 'gemini' %}selected{% endif %}>Google Gemini</option>
                             <option value="ollama" {% if settings.modules[module].provider == 'ollama' %}selected{% endif %}>Ollama</option>
                         </select>
                     </div>
@@ -140,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <h3>API Keys</h3>
         </div>
         <div class="card-content space-y-4">
-            <p class="text-[0.8125rem] text-muted-foreground">In production, use environment variables (<span class="font-mono text-[0.75rem]">ANTHROPIC_API_KEY</span>, <span class="font-mono text-[0.75rem]">OPENAI_API_KEY</span>).</p>
+            <p class="text-[0.8125rem] text-muted-foreground">In production, use environment variables (<span class="font-mono text-[0.75rem]">ANTHROPIC_API_KEY</span>, <span class="font-mono text-[0.75rem]">OPENAI_API_KEY</span>, <span class="font-mono text-[0.75rem]">GOOGLE_API_KEY</span>).</p>
             <div>
                 <label class="label">Anthropic API Key</label>
                 <input type="password" name="anthropic_api_key" placeholder="sk-ant-..." class="input">
@@ -150,12 +159,44 @@ document.addEventListener('DOMContentLoaded', function() {
                 <input type="password" name="openai_api_key" placeholder="sk-..." class="input">
             </div>
             <div>
+                <label class="label">Google Gemini API Key</label>
+                <input type="password" name="google_api_key" placeholder="AIza..." class="input">
+            </div>
+            <div>
                 <label class="label">Ollama Base URL</label>
                 <input type="text" name="ollama_base_url" value="{{ settings.providers.ollama.base_url }}" class="input">
             </div>
         </div>
     </div>
 
-    <button type="submit" class="btn btn-primary">Save Settings</button>
+    <button id="save-btn" type="submit" class="btn btn-primary">
+        <span id="save-label">Save Settings</span>
+        <span id="save-saving" class="hidden items-center gap-2">
+            <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            Saving...
+        </span>
+        <span id="save-done" class="hidden items-center gap-2">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Saved
+        </span>
+    </button>
 </form>
+
+<script>
+function setSaveState(state) {
+    var btn = document.getElementById('save-btn');
+    var label = document.getElementById('save-label');
+    var saving = document.getElementById('save-saving');
+    var done = document.getElementById('save-done');
+
+    label.className = state === 'idle' ? '' : 'hidden';
+    saving.className = state === 'saving' ? 'inline-flex items-center gap-2' : 'hidden';
+    done.className = state === 'saved' ? 'inline-flex items-center gap-2' : 'hidden';
+    btn.disabled = state === 'saving';
+
+    if (state === 'saved') {
+        setTimeout(function() { setSaveState('idle'); }, 2000);
+    }
+}
+</script>
 {% endblock %}

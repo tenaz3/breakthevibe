@@ -2,6 +2,7 @@
 
 from breakthevibe.exceptions import LLMProviderError
 from breakthevibe.llm.anthropic import AnthropicProvider
+from breakthevibe.llm.gemini_provider import GeminiProvider
 from breakthevibe.llm.ollama_provider import OllamaProvider
 from breakthevibe.llm.openai_provider import OpenAIProvider
 from breakthevibe.llm.provider import LLMProviderBase
@@ -25,6 +26,10 @@ def create_llm_provider(
         if not api_key:
             raise LLMProviderError("API key required for OpenAI provider")
         return OpenAIProvider(api_key=api_key, **({"model": model} if model else {}))
+    elif provider_str == LLMProvider.GEMINI:
+        if not api_key:
+            raise LLMProviderError("API key required for Gemini provider")
+        return GeminiProvider(api_key=api_key, **({"model": model} if model else {}))
     elif provider_str == LLMProvider.OLLAMA:
         kwargs: dict[str, str] = {}
         if model:

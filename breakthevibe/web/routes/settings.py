@@ -112,6 +112,8 @@ async def update_llm_settings(
         updates["anthropic_api_key"] = str(form["anthropic_api_key"])
     if form.get("openai_api_key"):
         updates["openai_api_key"] = str(form["openai_api_key"])
+    if form.get("google_api_key"):
+        updates["google_api_key"] = str(form["google_api_key"])
     if form.get("ollama_base_url"):
         updates["ollama_base_url"] = str(form["ollama_base_url"])
 

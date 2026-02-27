@@ -29,6 +29,7 @@ _DEFAULTS: dict[str, Any] = {
     "providers": {
         "anthropic": {"api_key": ""},
         "openai": {"api_key": ""},
+        "gemini": {"api_key": ""},
         "ollama": {"base_url": "http://localhost:11434"},
     },
 }

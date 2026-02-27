@@ -76,16 +76,21 @@ async def build_pipeline(
         # Try provider from settings, then fall back to env
         api_key = llm_settings.get("anthropic_api_key") or settings.anthropic_api_key
         openai_key = llm_settings.get("openai_api_key") or settings.openai_api_key
+        google_key = llm_settings.get("google_api_key") or settings.google_api_key
         ollama_url = llm_settings.get("ollama_base_url") or settings.ollama_base_url
 
         if provider == "openai" and openai_key:
             return create_llm_provider("openai", api_key=openai_key, model=model)
+        if provider == "gemini" and google_key:
+            return create_llm_provider("gemini", api_key=google_key, model=model)
         if provider == "ollama" and ollama_url:
             return create_llm_provider("ollama", base_url=ollama_url, model=model)
         if api_key:
             return create_llm_provider("anthropic", api_key=api_key, model=model)
         if openai_key:
             return create_llm_provider("openai", api_key=openai_key, model=model)
+        if google_key:
+            return create_llm_provider("gemini", api_key=google_key, model=model)
         if ollama_url:
             return create_llm_provider("ollama", base_url=ollama_url, model=model)
         return None
