@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     # SSRF
     allow_private_urls: bool = True
 
+    # Object Storage (S3/R2)
+    use_s3: bool = False
+    s3_bucket: str = ""
+    s3_endpoint_url: str | None = None
+    s3_access_key_id: str | None = None
+    s3_secret_access_key: str | None = None
+    s3_region: str = "auto"
+
     # LLM Providers (all optional)
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None

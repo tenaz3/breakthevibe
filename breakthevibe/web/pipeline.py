@@ -40,8 +40,15 @@ async def build_pipeline(
     settings = get_settings()
     run_id = str(uuid.uuid4())
 
-    # Artifact storage
-    artifacts = ArtifactStore(base_dir=Path(settings.artifacts_dir).expanduser())
+    # Artifact storage (with optional ObjectStore backend and org_id)
+    from breakthevibe.storage.object_store import create_object_store
+
+    store = create_object_store() if settings.use_s3 else None
+    artifacts = ArtifactStore(
+        base_dir=Path(settings.artifacts_dir).expanduser(),
+        store=store,
+        org_id=org_id,
+    )
 
     # Rules engine (always available, uses defaults if no YAML)
     rules = RulesEngine.from_yaml(rules_yaml)
