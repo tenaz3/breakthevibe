@@ -71,6 +71,12 @@ def create_app() -> FastAPI:
     # Public routes (no auth required)
     app.include_router(auth_router)
 
+    # Clerk webhooks (public, signature-verified internally)
+    if settings.auth_mode == "clerk":
+        from breakthevibe.web.auth.webhook import router as webhook_router
+
+        app.include_router(webhook_router)
+
     # Health check (public)
     @app.get("/api/health")
     async def health_check() -> dict[str, object]:

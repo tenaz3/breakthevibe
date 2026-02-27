@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     admin_username: str | None = None
     admin_password: str | None = None
 
+    # Clerk (required when auth_mode == "clerk")
+    clerk_publishable_key: str | None = None
+    clerk_secret_key: str | None = None
+    clerk_webhook_secret: str | None = None
+    clerk_jwks_url: str | None = None
+    clerk_issuer: str | None = None
+    clerk_frontend_api: str | None = None
+
     # Environment & CORS
     environment: str = "development"
     allowed_origins: list[str] = ["http://localhost:8000", "http://127.0.0.1:8000"]
