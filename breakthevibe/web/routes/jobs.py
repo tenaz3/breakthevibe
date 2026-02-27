@@ -17,12 +17,6 @@ router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 def _get_queue() -> JobQueue:
     """Get the job queue instance."""
-    from breakthevibe.config.settings import get_settings
-
-    settings = get_settings()
-    if not settings.use_database:
-        raise HTTPException(status_code=501, detail="Job queue requires database")
-
     from breakthevibe.storage.database import get_engine
     from breakthevibe.worker.queue import JobQueue as _JobQueue
 

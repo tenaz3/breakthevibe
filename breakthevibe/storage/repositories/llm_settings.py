@@ -1,4 +1,4 @@
-"""LLM settings repository — in-memory with DB-backed persistence."""
+"""LLM settings repository — PostgreSQL-backed."""
 
 from __future__ import annotations
 
@@ -73,19 +73,3 @@ class LlmSettingsRepository:
         """Persist multiple settings at once for an org."""
         for key, value in updates.items():
             await self.set(key, value, org_id=org_id)
-
-
-class InMemoryLlmSettingsRepository:
-    """In-memory fallback for dev/testing without a database."""
-
-    def __init__(self) -> None:
-        self._settings: dict[str, dict[str, Any]] = {SENTINEL_ORG_ID: _DEFAULTS.copy()}
-
-    async def get_all(self, org_id: str = SENTINEL_ORG_ID) -> dict[str, Any]:
-        return self._settings.get(org_id, _DEFAULTS).copy()
-
-    async def set(self, key: str, value: Any, org_id: str = SENTINEL_ORG_ID) -> None:
-        self._settings.setdefault(org_id, _DEFAULTS.copy())[key] = value
-
-    async def set_many(self, updates: dict[str, Any], org_id: str = SENTINEL_ORG_ID) -> None:
-        self._settings.setdefault(org_id, _DEFAULTS.copy()).update(updates)

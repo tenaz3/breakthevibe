@@ -22,8 +22,12 @@ class SessionAuth:
         self._max_age = max_age
         self._sessions: dict[str, dict[str, Any]] = {}
 
-    def create_session(self, username: str) -> str:
-        """Create a new session and return the token."""
+    def create_session(self, username: str, **extra: Any) -> str:
+        """Create a new session and return the token.
+
+        Extra kwargs (user_id, org_id, role, email) are stored in the session
+        dict alongside ``username`` and ``created_at``.
+        """
         token = secrets.token_urlsafe(32)
         signature = self._sign(token)
         signed_token = f"{token}.{signature}"
@@ -31,6 +35,7 @@ class SessionAuth:
         self._sessions[signed_token] = {
             "username": username,
             "created_at": time.time(),
+            **extra,
         }
         logger.info("session_created", username=username)
         return signed_token

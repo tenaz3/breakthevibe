@@ -117,16 +117,15 @@ async def update_llm_settings(
     if form.get("ollama_base_url"):
         updates["ollama_base_url"] = str(form["ollama_base_url"])
 
-    # Per-module settings are stored as nested dicts
+    # Per-module settings are stored as nested dicts.
+    # Always save the value (even empty string) so "Use default" clears overrides.
     current = await llm_settings_repo.get_all(org_id=tenant.org_id)
     modules = current.get("modules", {})
     for module in ["mapper", "generator", "agent"]:
         provider = form.get(f"modules_{module}_provider")
         model = form.get(f"modules_{module}_model")
-        if provider:
-            modules.setdefault(module, {})["provider"] = str(provider)
-        if model:
-            modules.setdefault(module, {})["model"] = str(model)
+        modules.setdefault(module, {})["provider"] = str(provider) if provider else ""
+        modules.setdefault(module, {})["model"] = str(model) if model else ""
     updates["modules"] = modules
 
     await llm_settings_repo.set_many(updates, org_id=tenant.org_id)

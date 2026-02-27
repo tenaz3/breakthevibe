@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from breakthevibe.config.settings import get_settings
+from breakthevibe.config.settings import SENTINEL_ORG_ID, SENTINEL_USER_ID, get_settings
 from breakthevibe.web.auth.session import require_auth
 from breakthevibe.web.tenant_context import TenantContext, get_single_tenant_context
 
@@ -27,6 +27,9 @@ async def get_tenant(
 
     if settings.auth_mode == "single":
         return get_single_tenant_context()
+
+    if settings.auth_mode == "passkey":
+        return _resolve_passkey_tenant(_user)
 
     # Clerk mode — extract JWT from Authorization header
     return await _resolve_clerk_tenant(request)
@@ -55,6 +58,16 @@ async def require_admin(
     if tenant.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return tenant
+
+
+def _resolve_passkey_tenant(user: dict[str, object]) -> TenantContext:
+    """Build TenantContext from session data populated during passkey auth."""
+    return TenantContext(
+        org_id=str(user.get("org_id", SENTINEL_ORG_ID)),
+        user_id=str(user.get("user_id", SENTINEL_USER_ID)),
+        role=str(user.get("role", "admin")),
+        email=str(user.get("email", "")),
+    )
 
 
 async def _resolve_clerk_tenant(request: Request) -> TenantContext:

@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 import structlog
 from structlog.contextvars import bind_contextvars, unbind_contextvars
 
+from breakthevibe.config.settings import SENTINEL_ORG_ID
+
 if TYPE_CHECKING:
     from breakthevibe.agent.planner import AgentPlanner
     from breakthevibe.generator.code_builder import CodeBuilder
@@ -171,6 +173,8 @@ class PipelineOrchestrator:
                     failed_stage=stage,
                     error_message=last_error,
                     duration_seconds=duration,
+                    report=context.get("report"),
+                    sitemap=context.get("sitemap"),
                 )
 
         self._emit("", "done")
@@ -206,28 +210,25 @@ class PipelineOrchestrator:
 
         # Persist sitemap to DB (#11)
         try:
-            from breakthevibe.config.settings import get_settings
+            from sqlmodel.ext.asyncio.session import AsyncSession
 
-            settings = get_settings()
-            if settings.use_database:
-                from sqlmodel.ext.asyncio.session import AsyncSession
+            from breakthevibe.models.database import CrawlRun
+            from breakthevibe.storage.database import get_engine
 
-                from breakthevibe.models.database import CrawlRun
-                from breakthevibe.storage.database import get_engine
-
-                async with AsyncSession(get_engine()) as session:
-                    try:
-                        pid = int(context["project_id"])
-                    except (ValueError, TypeError):
-                        logger.warning("invalid_project_id", project_id=context["project_id"])
-                        return
-                    crawl_run = CrawlRun(
-                        project_id=pid,
-                        status="completed",
-                        site_map_json=result.model_dump_json(),
-                    )
-                    session.add(crawl_run)
-                    await session.commit()
+            async with AsyncSession(get_engine()) as session:
+                try:
+                    pid = int(context["project_id"])
+                except (ValueError, TypeError):
+                    logger.warning("invalid_project_id", project_id=context["project_id"])
+                    return
+                crawl_run = CrawlRun(
+                    project_id=pid,
+                    org_id=context.get("org_id", SENTINEL_ORG_ID),
+                    status="completed",
+                    site_map_json=result.model_dump_json(),
+                )
+                session.add(crawl_run)
+                await session.commit()
         except Exception as e:
             logger.warning("sitemap_persist_failed", error=str(e))
 

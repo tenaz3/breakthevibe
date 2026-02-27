@@ -24,6 +24,7 @@ from breakthevibe.models.database import (  # noqa: F401
     TestRun,
     UsageRecord,
     User,
+    WebAuthnCredential,
 )
 
 config = context.config

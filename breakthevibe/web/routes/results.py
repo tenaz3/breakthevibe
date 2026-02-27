@@ -8,7 +8,7 @@ import structlog
 from fastapi import APIRouter, Depends
 
 from breakthevibe.web.auth.rbac import get_tenant
-from breakthevibe.web.dependencies import _cache_key, pipeline_results
+from breakthevibe.web.dependencies import test_run_repo
 
 if TYPE_CHECKING:
     from breakthevibe.web.tenant_context import TenantContext
@@ -23,26 +23,26 @@ async def get_run_results(
     run_id: str,
     tenant: TenantContext = Depends(get_tenant),
 ) -> dict[str, Any]:
-    # Search through pipeline results for matching run_id (scoped to tenant)
-    prefix = f"{tenant.org_id}:"
-    for key, result in pipeline_results.items():
-        if key.startswith(prefix) and result.get("run_id") == run_id:
-            return {
-                "run_id": run_id,
-                "status": "completed" if result.get("success") else "failed",
-                "completed_stages": result.get("completed_stages", []),
-                "failed_stage": result.get("failed_stage"),
-                "error_message": result.get("error_message", ""),
-                "duration_seconds": result.get("duration_seconds", 0),
-            }
-
+    result = await test_run_repo.get_by_run_uuid(run_id, org_id=tenant.org_id)
+    if not result:
+        return {
+            "run_id": run_id,
+            "status": "not_found",
+            "suites": [],
+            "total": 0,
+            "passed": 0,
+            "failed": 0,
+        }
     return {
         "run_id": run_id,
-        "status": "not_found",
-        "suites": [],
-        "total": 0,
-        "passed": 0,
-        "failed": 0,
+        "status": "completed" if result.get("success") else "failed",
+        "completed_stages": result.get("completed_stages", []),
+        "failed_stage": result.get("failed_stage"),
+        "error_message": result.get("error_message", ""),
+        "duration_seconds": result.get("duration_seconds", 0),
+        "total": result.get("total", 0),
+        "passed": result.get("passed", 0),
+        "failed": result.get("failed", 0),
     }
 
 
@@ -51,8 +51,12 @@ async def get_project_results(
     project_id: str,
     tenant: TenantContext = Depends(get_tenant),
 ) -> dict[str, Any]:
-    key = _cache_key(tenant.org_id, project_id)
-    result = pipeline_results.get(key)
+    try:
+        pid = int(project_id)
+    except (ValueError, TypeError):
+        return {"project_id": project_id, "status": "no_runs"}
+
+    result = await test_run_repo.get_latest_for_project(pid, org_id=tenant.org_id)
     if not result:
         return {"project_id": project_id, "status": "no_runs"}
     return {
@@ -60,6 +64,10 @@ async def get_project_results(
         "run_id": result.get("run_id"),
         "status": "completed" if result.get("success") else "failed",
         "completed_stages": result.get("completed_stages", []),
+        "failed_stage": result.get("failed_stage"),
         "error_message": result.get("error_message", ""),
         "duration_seconds": result.get("duration_seconds", 0),
+        "total": result.get("total", 0),
+        "passed": result.get("passed", 0),
+        "failed": result.get("failed", 0),
     }

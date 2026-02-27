@@ -17,7 +17,6 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql+asyncpg://breakthevibe:breakthevibe@localhost:5432/breakthevibe"
-    use_database: bool = False  # Set True in production to use PostgreSQL repos
 
     # App
     secret_key: str = "change-me-in-production"
@@ -26,11 +25,16 @@ class Settings(BaseSettings):
     artifacts_dir: str = "~/.breakthevibe/projects"
 
     # Multi-tenancy
-    auth_mode: Literal["single", "clerk"] = "single"
+    auth_mode: Literal["single", "clerk", "passkey"] = "single"
 
     # Auth (env-var based; if unset, MVP mode accepts any credentials)
     admin_username: str | None = None
     admin_password: str | None = None
+
+    # WebAuthn / Passkey (used when auth_mode == "passkey")
+    webauthn_rp_id: str = "localhost"  # Relying party ID (domain, no port/scheme)
+    webauthn_rp_name: str = "BreakTheVibe"
+    webauthn_origin: str = "http://localhost:8000"  # Full origin including scheme + port
 
     # Clerk (required when auth_mode == "clerk")
     clerk_publishable_key: str | None = None
@@ -73,7 +77,4 @@ def get_settings() -> Settings:
             UserWarning,
             stacklevel=2,
         )
-    if settings.auth_mode == "clerk" and not settings.use_database:
-        msg = "AUTH_MODE=clerk requires USE_DATABASE=true"
-        raise ValueError(msg)
     return settings

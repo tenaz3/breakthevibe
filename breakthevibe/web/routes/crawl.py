@@ -9,12 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 
 from breakthevibe.audit.logger import audit
 from breakthevibe.web.auth.rbac import get_tenant
-from breakthevibe.web.dependencies import (
-    _cache_key,
-    pipeline_results,
-    project_repo,
-    run_pipeline,
-)
+from breakthevibe.web.dependencies import crawl_run_repo, project_repo, run_pipeline
 
 if TYPE_CHECKING:
     from breakthevibe.web.tenant_context import TenantContext
@@ -70,9 +65,13 @@ async def get_sitemap(
     project = await project_repo.get(project_id, org_id=tenant.org_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    key = _cache_key(tenant.org_id, project_id)
-    result = pipeline_results.get(key, {})
-    sitemap = result.get("sitemap", {})
+    try:
+        pid = int(project_id)
+    except (ValueError, TypeError):
+        return {"project_id": project_id, "pages": [], "api_endpoints": []}
+    sitemap = await crawl_run_repo.get_latest_sitemap(pid, org_id=tenant.org_id)
+    if not sitemap:
+        return {"project_id": project_id, "pages": [], "api_endpoints": []}
     return {
         "project_id": project_id,
         "pages": sitemap.get("pages", []),

@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from breakthevibe.web.auth.rbac import get_tenant
-from breakthevibe.web.dependencies import _cache_key, pipeline_results, project_repo
+from breakthevibe.web.dependencies import project_repo, test_run_repo
 
 if TYPE_CHECKING:
     from breakthevibe.web.tenant_context import TenantContext
@@ -63,22 +63,11 @@ async def test_runs_page(
     project = await project_repo.get(project_id, org_id=tenant.org_id)
     if not project:
         return HTMLResponse(content="Project not found", status_code=404)
-    key = _cache_key(tenant.org_id, project_id)
-    result = pipeline_results.get(key, {})
-    runs = []
-    if result.get("run_id"):
-        runs.append(
-            {
-                "run_id": result["run_id"],
-                "status": result.get(
-                    "status",
-                    "passed" if result.get("success") else "failed",
-                ),
-                "total": result.get("total", 0),
-                "passed": result.get("passed", 0),
-                "failed": result.get("failed", 0),
-            }
-        )
+    try:
+        pid = int(project_id)
+    except (ValueError, TypeError):
+        pid = 0
+    runs = await test_run_repo.list_for_project(pid, org_id=tenant.org_id)
     return templates.TemplateResponse(request, "test_runs.html", {"project": project, "runs": runs})
 
 
@@ -94,9 +83,12 @@ async def test_suites_page(
     if not project:
         return HTMLResponse(content="Project not found", status_code=404)
 
-    key = _cache_key(tenant.org_id, project_id)
-    result = pipeline_results.get(key, {})
-    suites = result.get("suites", [])
+    try:
+        pid = int(project_id)
+    except (ValueError, TypeError):
+        pid = 0
+    result = await test_run_repo.get_latest_for_project(pid, org_id=tenant.org_id)
+    suites: list[dict[str, Any]] = result.get("suites", []) if result else []
 
     # Group suites by route, optionally filtering by category
     suites_by_route: dict[str, list[dict[str, Any]]] = {}
@@ -133,13 +125,7 @@ async def test_result_detail_page(
     run_id: str,
     tenant: TenantContext = Depends(get_tenant),
 ) -> HTMLResponse:
-    # Find the result matching this run_id (scoped to tenant)
-    result: dict[str, Any] = {}
-    prefix = f"{tenant.org_id}:"
-    for key, res in pipeline_results.items():
-        if key.startswith(prefix) and res.get("run_id") == run_id:
-            result = res
-            break
+    result: dict[str, Any] = await test_run_repo.get_by_run_uuid(run_id, org_id=tenant.org_id) or {}
 
     suites = result.get("suites", [])
     status = result.get("status", "passed" if result.get("success") else "failed")

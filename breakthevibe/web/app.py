@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 from urllib.parse import quote
 
 import structlog
@@ -34,6 +38,18 @@ from breakthevibe.web.security_headers import SecurityHeadersMiddleware
 logger = structlog.get_logger(__name__)
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Run startup tasks before the app begins serving requests."""
+    settings = get_settings()
+    if settings.auth_mode == "passkey":
+        from breakthevibe.web.dependencies import user_repo
+
+        await user_repo.ensure_sentinel_org()
+        logger.info("passkey_bootstrap_ready", msg="sentinel org ensured")
+    yield
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     settings = get_settings()
@@ -43,6 +59,7 @@ def create_app() -> FastAPI:
         title="BreakTheVibe",
         description="AI-powered QA automation platform",
         version="0.1.0",
+        lifespan=_lifespan,
     )
 
     # Redirect 401s to /login for browser page requests; return JSON for API

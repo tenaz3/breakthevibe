@@ -8,96 +8,57 @@ from typing import Any
 import structlog
 
 from breakthevibe.config.settings import SENTINEL_ORG_ID, get_settings
-from breakthevibe.storage.repositories.llm_settings import InMemoryLlmSettingsRepository
-from breakthevibe.storage.repositories.projects import ProjectRepository
+from breakthevibe.storage.database import get_engine
+from breakthevibe.storage.repositories.crawl_runs import CrawlRunRepository
+from breakthevibe.storage.repositories.db_projects import DatabaseProjectRepository
+from breakthevibe.storage.repositories.llm_settings import LlmSettingsRepository
+from breakthevibe.storage.repositories.test_runs import TestRunRepository
+from breakthevibe.storage.repositories.users import DatabaseUserRepository
+from breakthevibe.storage.repositories.webauthn import DatabaseWebAuthnCredentialRepository
 
 logger = structlog.get_logger(__name__)
 
 
-def _create_project_repo() -> ProjectRepository | Any:
-    """Create the appropriate project repository based on settings."""
+def _create_passkey_service() -> Any:
+    """Create the PasskeyService if auth_mode == 'passkey'."""
     settings = get_settings()
-    if settings.use_database:
-        from breakthevibe.storage.database import get_engine
-        from breakthevibe.storage.repositories.db_projects import (
-            DatabaseProjectRepository,
-        )
+    if settings.auth_mode != "passkey":
+        return None
 
-        return DatabaseProjectRepository(get_engine())
-    return ProjectRepository()
+    from breakthevibe.web.auth.passkey_service import PasskeyService
 
-
-def _create_llm_settings_repo() -> Any:
-    """Create the appropriate LLM settings repository."""
-    settings = get_settings()
-    if settings.use_database:
-        from breakthevibe.storage.database import get_engine
-        from breakthevibe.storage.repositories.llm_settings import LlmSettingsRepository
-
-        return LlmSettingsRepository(get_engine())
-    return InMemoryLlmSettingsRepository()
+    return PasskeyService(
+        credential_repo=webauthn_credential_repo,
+        user_repo=user_repo,
+        rp_id=settings.webauthn_rp_id,
+        rp_name=settings.webauthn_rp_name,
+        origin=settings.webauthn_origin,
+    )
 
 
-# Shared repositories
-project_repo = _create_project_repo()
-llm_settings_repo = _create_llm_settings_repo()
+# Shared repositories — always PostgreSQL
+project_repo = DatabaseProjectRepository(get_engine())
+llm_settings_repo = LlmSettingsRepository(get_engine())
+user_repo = DatabaseUserRepository(get_engine())
+webauthn_credential_repo = DatabaseWebAuthnCredentialRepository(get_engine())
+test_run_repo = TestRunRepository(get_engine())
+crawl_run_repo = CrawlRunRepository(get_engine())
+passkey_service = _create_passkey_service()
 
-# Store pipeline run results in memory keyed by "{org_id}:{project_id}"
-pipeline_results: dict[str, dict[str, Any]] = {}
-
-# Per-pipeline locks keyed by "{org_id}:{project_id}"
+# Per-pipeline locks keyed by "{org_id}:{project_id}" (process-local)
 _pipeline_locks: dict[str, asyncio.Lock] = {}
 
 
-def _cache_key(org_id: str, project_id: str) -> str:
-    """Build a tenant-namespaced cache key."""
+def _lock_key(org_id: str, project_id: str) -> str:
     return f"{org_id}:{project_id}"
 
 
 def _get_pipeline_lock(org_id: str, project_id: str) -> asyncio.Lock:
     """Get or create an asyncio.Lock for a specific org+project."""
-    key = _cache_key(org_id, project_id)
+    key = _lock_key(org_id, project_id)
     if key not in _pipeline_locks:
         _pipeline_locks[key] = asyncio.Lock()
     return _pipeline_locks[key]
-
-
-async def _persist_test_run(
-    project_id: str,
-    result_data: dict[str, Any],
-    org_id: str = SENTINEL_ORG_ID,
-) -> None:
-    """Persist test run results to DB when database is enabled."""
-    settings = get_settings()
-    if not settings.use_database:
-        return
-
-    try:
-        from sqlmodel.ext.asyncio.session import AsyncSession
-
-        from breakthevibe.models.database import TestRun
-        from breakthevibe.storage.database import get_engine
-
-        async with AsyncSession(get_engine()) as session:
-            try:
-                pid = int(project_id)
-            except (ValueError, TypeError):
-                logger.warning("invalid_project_id_for_persist", project_id=project_id)
-                return
-            test_run = TestRun(
-                project_id=pid,
-                org_id=org_id,
-                status="completed" if result_data.get("success") else "failed",
-                execution_mode="smart",
-                total=len(result_data.get("completed_stages", [])),
-                passed=1 if result_data.get("success") else 0,
-                failed=0 if result_data.get("success") else 1,
-            )
-            session.add(test_run)
-            await session.commit()
-            logger.info("test_run_persisted", project_id=project_id, org_id=org_id)
-    except (OSError, ValueError, RuntimeError) as e:
-        logger.warning("test_run_persist_failed", error=str(e))
 
 
 async def run_pipeline(
@@ -110,7 +71,6 @@ async def run_pipeline(
     from breakthevibe.web.pipeline import build_pipeline
     from breakthevibe.web.sse import PipelineProgressEvent, progress_bus
 
-    cache_key = _cache_key(org_id, project_id)
     lock = _get_pipeline_lock(org_id, project_id)
     if lock.locked():
         logger.warning("pipeline_already_running", project_id=project_id, org_id=org_id)
@@ -145,7 +105,11 @@ async def run_pipeline(
                 progress_callback=_progress,
                 org_id=org_id,
             )
-            result = await orchestrator.run(project_id=project_id, url=url, rules_yaml=rules_yaml)
+            result = await orchestrator.run(
+                project_id=project_id,
+                url=url,
+                rules_yaml=rules_yaml,
+            )
 
             # Build rich result data including report details
             report = result.report
@@ -181,18 +145,16 @@ async def run_pipeline(
                     }
                     for r in report.results
                 ]
-            # Store sitemap for the /api/projects/{id}/sitemap endpoint
-            if result.sitemap:
-                result_data["sitemap"] = (
-                    result.sitemap.model_dump()
-                    if hasattr(result.sitemap, "model_dump")
-                    else result.sitemap
+
+            # Persist to DB
+            try:
+                await test_run_repo.save_pipeline_result(
+                    project_id=int(project_id),
+                    org_id=org_id,
+                    result_data=result_data,
                 )
-
-            pipeline_results[cache_key] = result_data
-
-            # Also persist to DB
-            await _persist_test_run(project_id, result_data, org_id=org_id)
+            except (ValueError, TypeError, OSError) as persist_err:
+                logger.warning("test_run_persist_failed", error=str(persist_err))
 
             status = "completed" if result.success else "failed"
             await project_repo.update(
@@ -221,7 +183,12 @@ async def run_pipeline(
                 )
             )
             await project_repo.update(project_id, org_id=org_id, status="failed")
-            pipeline_results[cache_key] = {
-                "success": False,
-                "error_message": str(e),
-            }
+            # Persist the failure to DB
+            try:
+                await test_run_repo.save_pipeline_result(
+                    project_id=int(project_id),
+                    org_id=org_id,
+                    result_data={"success": False, "error_message": str(e)},
+                )
+            except (ValueError, TypeError, OSError) as persist_err:
+                logger.warning("test_run_persist_failed", error=str(persist_err))

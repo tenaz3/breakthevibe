@@ -73,6 +73,24 @@ async def build_pipeline(
         provider = mod_cfg.get("provider") or llm_settings.get("default_provider")
         model = mod_cfg.get("model") or llm_settings.get("default_model")
 
+        # Guard: drop model if it doesn't match the provider (prevents
+        # sending e.g. "gemini-2.5-flash" to Anthropic or vice versa).
+        _provider_prefixes = {
+            "anthropic": "claude-",
+            "openai": ("gpt-", "o1-", "o3-"),
+            "gemini": "gemini-",
+        }
+        if provider and model:
+            expected = _provider_prefixes.get(provider)
+            if expected and not model.startswith(expected):
+                logger.warning(
+                    "model_provider_mismatch",
+                    provider=provider,
+                    model=model,
+                    module=module_name,
+                )
+                model = None  # Let the provider use its built-in default
+
         # Try provider from settings, then fall back to env
         api_key = llm_settings.get("anthropic_api_key") or settings.anthropic_api_key
         openai_key = llm_settings.get("openai_api_key") or settings.openai_api_key

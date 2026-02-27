@@ -87,6 +87,23 @@
             <div id="login-error" class="hidden mb-4 px-3 py-2.5 rounded-lg text-[0.8125rem]"
                  style="background: var(--callout-destructive-bg); border: 1px solid var(--callout-destructive-border); color: var(--callout-destructive-text);"></div>
 
+            {% if auth_mode == "passkey" %}
+            <!-- Passkey login -->
+            <div id="passkey-login">
+                <p class="text-[0.8125rem] text-muted-foreground mb-4 text-center">
+                    Use your passkey to sign in securely.
+                </p>
+                <button id="passkey-btn" type="button"
+                        class="w-full flex justify-center items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-[0.8125rem] font-medium hover:opacity-90 transition-opacity">
+                    <svg class="passkey-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/>
+                        <circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>
+                    </svg>
+                    <span class="passkey-label">Sign in with passkey</span>
+                </button>
+            </div>
+            {% else %}
+            <!-- Password login -->
             <form id="login-form" class="space-y-4">
                 <div>
                     <label for="username" class="block text-[0.8125rem] font-medium text-foreground mb-1.5">Username</label>
@@ -103,6 +120,7 @@
                     Sign in
                 </button>
             </form>
+            {% endif %}
         </div>
 
         <p class="text-center text-[0.75rem] text-muted-foreground/50 mt-6">AI-powered QA automation</p>
@@ -116,13 +134,118 @@
         localStorage.setItem('btv-theme', html.classList.contains('dark') ? 'dark' : 'light');
     });
 
-    /* Login form */
+    var errEl = document.getElementById('login-error');
+    function showError(msg) {
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+    }
+    function hideError() {
+        errEl.classList.add('hidden');
+    }
+
+    {% if auth_mode == "passkey" %}
+    /* ── Passkey login ─────────────────────────────────────── */
+    (function() {
+        var btn = document.getElementById('passkey-btn');
+        var label = btn.querySelector('.passkey-label');
+
+        /* On load, check if setup is needed (redirect to /register) */
+        fetch('/api/auth/bootstrap-status')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.needs_setup) {
+                    window.location.href = '/register';
+                }
+            })
+            .catch(function(err) {
+                console.error('Bootstrap status check failed:', err);
+            });
+
+        btn.addEventListener('click', async function() {
+            hideError();
+            btn.disabled = true;
+            label.textContent = 'Authenticating\u2026';
+
+            try {
+                /* Step 1: Get authentication options */
+                var beginRes = await fetch('/api/auth/passkey/authenticate/begin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}',
+                });
+                if (!beginRes.ok) {
+                    var errMsg = 'Failed to start authentication';
+                    try { var errData = await beginRes.json(); errMsg = errData.detail || errMsg; }
+                    catch (_) { errMsg = 'Server error (' + beginRes.status + '). Please try again.'; }
+                    throw new Error(errMsg);
+                }
+                var beginData = await beginRes.json();
+                var options = beginData.options;
+
+                /* Convert base64url strings to ArrayBuffers for WebAuthn API */
+                options.challenge = base64urlToBuffer(options.challenge);
+                if (options.allowCredentials) {
+                    options.allowCredentials = options.allowCredentials.map(function(c) {
+                        c.id = base64urlToBuffer(c.id);
+                        return c;
+                    });
+                }
+
+                /* Step 2: Browser prompts user for passkey */
+                var credential = await navigator.credentials.get({ publicKey: options });
+
+                /* Step 3: Send assertion to server */
+                var credentialJSON = JSON.stringify({
+                    id: credential.id,
+                    rawId: bufferToBase64url(credential.rawId),
+                    type: credential.type,
+                    response: {
+                        authenticatorData: bufferToBase64url(credential.response.authenticatorData),
+                        clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+                        signature: bufferToBase64url(credential.response.signature),
+                        userHandle: credential.response.userHandle ? bufferToBase64url(credential.response.userHandle) : null,
+                    },
+                    authenticatorAttachment: credential.authenticatorAttachment || null,
+                });
+
+                var completeRes = await fetch('/api/auth/passkey/authenticate/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        credential: credentialJSON,
+                        challenge_key: beginData.challenge_key,
+                    }),
+                });
+
+                if (completeRes.ok) {
+                    var next = new URLSearchParams(window.location.search).get('next') || '/';
+                    window.location.href = next;
+                } else {
+                    var errMsg2 = 'Authentication failed';
+                    try { var errData2 = await completeRes.json(); errMsg2 = errData2.detail || errMsg2; }
+                    catch (_) { errMsg2 = 'Server error (' + completeRes.status + '). Please try again.'; }
+                    showError(errMsg2);
+                }
+            } catch (err) {
+                if (err.name === 'NotAllowedError') {
+                    showError('Passkey authentication was cancelled.');
+                } else {
+                    showError(err.message || 'Authentication failed. Please try again.');
+                }
+            } finally {
+                btn.disabled = false;
+                label.textContent = 'Sign in with passkey';
+            }
+        });
+    })();
+
+    {% else %}
+    /* ── Password login ────────────────────────────────────── */
     document.getElementById('login-form').addEventListener('submit', async function(e) {
         e.preventDefault();
-        var form = e.target;
-        var errEl = document.getElementById('login-error');
-        errEl.classList.add('hidden');
+        hideError();
 
+        var form = e.target;
         var body = {
             username: form.username.value,
             password: form.password.value,
@@ -140,14 +263,31 @@
                 window.location.href = next;
             } else {
                 var data = await res.json();
-                errEl.textContent = data.detail || 'Login failed';
-                errEl.classList.remove('hidden');
+                showError(data.detail || 'Login failed');
             }
         } catch(err) {
-            errEl.textContent = 'Network error. Please try again.';
-            errEl.classList.remove('hidden');
+            showError('Network error. Please try again.');
         }
     });
+    {% endif %}
+
+    /* ── WebAuthn helpers ──────────────────────────────────── */
+    function base64urlToBuffer(base64url) {
+        var base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+        var pad = base64.length % 4;
+        if (pad) base64 += '='.repeat(4 - pad);
+        var binary = atob(base64);
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes.buffer;
+    }
+
+    function bufferToBase64url(buffer) {
+        var bytes = new Uint8Array(buffer);
+        var binary = '';
+        for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
     </script>
 </body>
 </html>

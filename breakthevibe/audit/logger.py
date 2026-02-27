@@ -116,16 +116,7 @@ async def audit(
     ip_address: str = "",
     request_id: str = "",
 ) -> None:
-    """Convenience wrapper — logs audit entry if database is available.
-
-    Silently no-ops when USE_DATABASE=false (single-tenant / dev mode).
-    """
-    from breakthevibe.config.settings import get_settings
-
-    settings = get_settings()
-    if not settings.use_database:
-        return
-
+    """Convenience wrapper — logs audit entry to the database."""
     from breakthevibe.storage.database import get_engine
 
     al = AuditLogger(get_engine())

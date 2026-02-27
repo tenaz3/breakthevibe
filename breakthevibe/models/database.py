@@ -125,12 +125,19 @@ class TestRun(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     org_id: str = Field(default=SENTINEL_ORG_ID, index=True)
     project_id: int = Field(foreign_key="projects.id", index=True)
+    run_uuid: str | None = Field(default=None, index=True)
     status: str = Field(default="pending")
     execution_mode: str = Field(default="smart")
     total: int = Field(default=0)
     passed: int = Field(default=0)
     failed: int = Field(default=0)
     healed: int = Field(default=0)
+    completed_stages_json: str | None = None
+    failed_stage: str | None = None
+    error_message: str | None = None
+    duration_seconds: float | None = None
+    suites_json: str | None = None
+    heal_warnings_json: str | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
     created_at: datetime = Field(default_factory=_utc_now)
@@ -226,6 +233,28 @@ class AuditLog(SQLModel, table=True):
     ip_address: str = ""
     request_id: str = ""
     created_at: datetime = Field(default_factory=_utc_now)
+
+
+# ---------------------------------------------------------------------------
+# WebAuthn credentials
+# ---------------------------------------------------------------------------
+
+
+class WebAuthnCredential(SQLModel, table=True):
+    __tablename__ = "webauthn_credentials"
+
+    id: str = Field(default_factory=_new_uuid, primary_key=True)
+    user_id: str = Field(foreign_key="users.id", index=True)
+    credential_id: bytes  # Unique passkey identifier from authenticator
+    public_key: bytes  # COSE-encoded public key
+    sign_count: int = Field(default=0)
+    aaguid: str = Field(default="")
+    transports: str = Field(default="[]")  # JSON array of transport strings
+    device_type: str = Field(default="single_device")  # single_device | multi_device
+    backed_up: bool = Field(default=False)
+    webauthn_user_id: bytes | None = None  # 64-byte random WebAuthn user handle
+    created_at: datetime = Field(default_factory=_utc_now)
+    last_used_at: datetime | None = None
 
 
 class LlmSetting(SQLModel, table=True):

@@ -26,6 +26,7 @@ dependencies = [
     "pyjwt[crypto]>=2.9.0",
     "aiobotocore>=2.15.0",
     "google-genai>=1.65.0",
+    "webauthn>=2.2.0",
 ]
 
 [dependency-groups]
@@ -37,6 +38,7 @@ dev = [
     "types-pyyaml>=6.0.12.20250915",
     "pip-audit>=2.7.0",
     "bandit>=1.7.0",
+    "aiosqlite>=0.20.0",
 ]
 
 [project.scripts]
