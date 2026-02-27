@@ -39,6 +39,13 @@ def _make_mock_page() -> AsyncMock:
 
     page.evaluate = AsyncMock(side_effect=_evaluate_side_effect)
     page.on = MagicMock()
+
+    # page.locator() is synchronous in Playwright — use MagicMock to avoid
+    # "coroutine never awaited" warnings from AsyncMock.
+    mock_locator = MagicMock()
+    mock_locator.count = AsyncMock(return_value=0)
+    page.locator = MagicMock(return_value=mock_locator)
+
     return page
 
 

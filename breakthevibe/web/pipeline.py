@@ -34,6 +34,7 @@ async def build_pipeline(
     url: str,
     rules_yaml: str = "",
     progress_callback: Callable[[str, str, str], None] | None = None,
+    org_id: str = "",
 ) -> PipelineOrchestrator:
     """Build a fully-wired pipeline orchestrator with real components."""
     settings = get_settings()
@@ -50,7 +51,11 @@ async def build_pipeline(
 
     llm_settings: dict[str, Any] = {}
     try:
-        llm_settings = await llm_settings_repo.get_all()
+        llm_settings = (
+            await llm_settings_repo.get_all(org_id=org_id)
+            if org_id
+            else await llm_settings_repo.get_all()
+        )
     except (OSError, ValueError, KeyError):
         logger.warning("llm_settings_load_failed")
 

@@ -7,7 +7,7 @@ from typing import Any
 
 import structlog
 
-from breakthevibe.config.settings import get_settings
+from breakthevibe.config.settings import SENTINEL_ORG_ID, get_settings
 from breakthevibe.storage.repositories.llm_settings import InMemoryLlmSettingsRepository
 from breakthevibe.storage.repositories.projects import ProjectRepository
 
@@ -19,7 +19,9 @@ def _create_project_repo() -> ProjectRepository | Any:
     settings = get_settings()
     if settings.use_database:
         from breakthevibe.storage.database import get_engine
-        from breakthevibe.storage.repositories.db_projects import DatabaseProjectRepository
+        from breakthevibe.storage.repositories.db_projects import (
+            DatabaseProjectRepository,
+        )
 
         return DatabaseProjectRepository(get_engine())
     return ProjectRepository()
@@ -40,21 +42,31 @@ def _create_llm_settings_repo() -> Any:
 project_repo = _create_project_repo()
 llm_settings_repo = _create_llm_settings_repo()
 
-# Store pipeline run results in memory (replaced by DB in production)
+# Store pipeline run results in memory keyed by "{org_id}:{project_id}"
 pipeline_results: dict[str, dict[str, Any]] = {}
 
-# Per-project locks to prevent concurrent pipeline runs
+# Per-pipeline locks keyed by "{org_id}:{project_id}"
 _pipeline_locks: dict[str, asyncio.Lock] = {}
 
 
-def _get_pipeline_lock(project_id: str) -> asyncio.Lock:
-    """Get or create an asyncio.Lock for a specific project."""
-    if project_id not in _pipeline_locks:
-        _pipeline_locks[project_id] = asyncio.Lock()
-    return _pipeline_locks[project_id]
+def _cache_key(org_id: str, project_id: str) -> str:
+    """Build a tenant-namespaced cache key."""
+    return f"{org_id}:{project_id}"
 
 
-async def _persist_test_run(project_id: str, result_data: dict[str, Any]) -> None:
+def _get_pipeline_lock(org_id: str, project_id: str) -> asyncio.Lock:
+    """Get or create an asyncio.Lock for a specific org+project."""
+    key = _cache_key(org_id, project_id)
+    if key not in _pipeline_locks:
+        _pipeline_locks[key] = asyncio.Lock()
+    return _pipeline_locks[key]
+
+
+async def _persist_test_run(
+    project_id: str,
+    result_data: dict[str, Any],
+    org_id: str = SENTINEL_ORG_ID,
+) -> None:
     """Persist test run results to DB when database is enabled."""
     settings = get_settings()
     if not settings.use_database:
@@ -74,6 +86,7 @@ async def _persist_test_run(project_id: str, result_data: dict[str, Any]) -> Non
                 return
             test_run = TestRun(
                 project_id=pid,
+                org_id=org_id,
                 status="completed" if result_data.get("success") else "failed",
                 execution_mode="smart",
                 total=len(result_data.get("completed_stages", [])),
@@ -82,23 +95,34 @@ async def _persist_test_run(project_id: str, result_data: dict[str, Any]) -> Non
             )
             session.add(test_run)
             await session.commit()
-            logger.info("test_run_persisted", project_id=project_id)
+            logger.info("test_run_persisted", project_id=project_id, org_id=org_id)
     except (OSError, ValueError, RuntimeError) as e:
         logger.warning("test_run_persist_failed", error=str(e))
 
 
-async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
+async def run_pipeline(
+    project_id: str,
+    url: str,
+    rules_yaml: str = "",
+    org_id: str = SENTINEL_ORG_ID,
+) -> None:
     """Run the full pipeline as a background task."""
     from breakthevibe.web.pipeline import build_pipeline
     from breakthevibe.web.sse import PipelineProgressEvent, progress_bus
 
-    lock = _get_pipeline_lock(project_id)
+    cache_key = _cache_key(org_id, project_id)
+    lock = _get_pipeline_lock(org_id, project_id)
     if lock.locked():
-        logger.warning("pipeline_already_running", project_id=project_id)
+        logger.warning("pipeline_already_running", project_id=project_id, org_id=org_id)
         return
 
     async with lock:
-        logger.info("pipeline_background_start", project_id=project_id, url=url)
+        logger.info(
+            "pipeline_background_start",
+            project_id=project_id,
+            org_id=org_id,
+            url=url,
+        )
 
         # Clear stale progress state from any previous run
         progress_bus.clear(project_id)
@@ -119,6 +143,7 @@ async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
                 url=url,
                 rules_yaml=rules_yaml,
                 progress_callback=_progress,
+                org_id=org_id,
             )
             result = await orchestrator.run(project_id=project_id, url=url, rules_yaml=rules_yaml)
 
@@ -128,7 +153,7 @@ async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
                 "run_id": result.run_id,
                 "success": result.success,
                 "completed_stages": [s.value for s in result.completed_stages],
-                "failed_stage": result.failed_stage.value if result.failed_stage else None,
+                "failed_stage": (result.failed_stage.value if result.failed_stage else None),
                 "error_message": result.error_message,
                 "duration_seconds": result.duration_seconds,
             }
@@ -164,17 +189,29 @@ async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
                     else result.sitemap
                 )
 
-            pipeline_results[project_id] = result_data
+            pipeline_results[cache_key] = result_data
 
             # Also persist to DB
-            await _persist_test_run(project_id, result_data)
+            await _persist_test_run(project_id, result_data, org_id=org_id)
 
             status = "completed" if result.success else "failed"
-            await project_repo.update(project_id, status=status, last_run_id=result.run_id)
-            logger.info("pipeline_background_done", project_id=project_id, success=result.success)
+            await project_repo.update(
+                project_id, org_id=org_id, status=status, last_run_id=result.run_id
+            )
+            logger.info(
+                "pipeline_background_done",
+                project_id=project_id,
+                org_id=org_id,
+                success=result.success,
+            )
 
         except Exception as e:
-            logger.error("pipeline_background_error", project_id=project_id, error=str(e))
+            logger.error(
+                "pipeline_background_error",
+                project_id=project_id,
+                org_id=org_id,
+                error=str(e),
+            )
             progress_bus.notify(
                 PipelineProgressEvent(
                     project_id=project_id,
@@ -183,8 +220,8 @@ async def run_pipeline(project_id: str, url: str, rules_yaml: str = "") -> None:
                     error=str(e),
                 )
             )
-            await project_repo.update(project_id, status="failed")
-            pipeline_results[project_id] = {
+            await project_repo.update(project_id, org_id=org_id, status="failed")
+            pipeline_results[cache_key] = {
                 "success": False,
                 "error_message": str(e),
             }

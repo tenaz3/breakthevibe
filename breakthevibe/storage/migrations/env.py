@@ -12,11 +12,14 @@ from sqlmodel import SQLModel
 from breakthevibe.models.database import (  # noqa: F401
     CrawlRun,
     LlmSetting,
+    Organization,
+    OrganizationMembership,
     Project,
     Route,
     TestCase,
     TestResult,
     TestRun,
+    User,
 )
 
 config = context.config

@@ -1,9 +1,15 @@
 """Application settings via Pydantic BaseSettings."""
 
+from __future__ import annotations
+
 import warnings
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings
+
+SENTINEL_ORG_ID = "00000000-0000-0000-0000-000000000001"
+SENTINEL_USER_ID = "00000000-0000-0000-0000-000000000002"
 
 
 class Settings(BaseSettings):
@@ -18,6 +24,9 @@ class Settings(BaseSettings):
     debug: bool = False
     log_level: str = "INFO"
     artifacts_dir: str = "~/.breakthevibe/projects"
+
+    # Multi-tenancy
+    auth_mode: Literal["single", "clerk"] = "single"
 
     # Auth (env-var based; if unset, MVP mode accepts any credentials)
     admin_username: str | None = None
@@ -43,4 +52,7 @@ def get_settings() -> Settings:
             UserWarning,
             stacklevel=2,
         )
+    if settings.auth_mode == "clerk" and not settings.use_database:
+        msg = "AUTH_MODE=clerk requires USE_DATABASE=true"
+        raise ValueError(msg)
     return settings

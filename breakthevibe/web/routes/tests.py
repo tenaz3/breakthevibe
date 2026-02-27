@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
-import structlog
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from typing import TYPE_CHECKING
 
+import structlog
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+
+from breakthevibe.web.auth.rbac import get_tenant
 from breakthevibe.web.dependencies import project_repo, run_pipeline
+
+if TYPE_CHECKING:
+    from breakthevibe.web.tenant_context import TenantContext
 
 logger = structlog.get_logger(__name__)
 
@@ -13,8 +19,12 @@ router = APIRouter(tags=["tests"])
 
 
 @router.post("/api/projects/{project_id}/generate")
-async def trigger_generate(project_id: str, background_tasks: BackgroundTasks) -> dict[str, str]:
-    project = await project_repo.get(project_id)
+async def trigger_generate(
+    project_id: str,
+    background_tasks: BackgroundTasks,
+    tenant: TenantContext = Depends(get_tenant),
+) -> dict[str, str]:
+    project = await project_repo.get(project_id, org_id=tenant.org_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -23,9 +33,10 @@ async def trigger_generate(project_id: str, background_tasks: BackgroundTasks) -
         project_id=project_id,
         url=project["url"],
         rules_yaml=project.get("rules_yaml", ""),
+        org_id=tenant.org_id,
     )
 
-    logger.info("generate_triggered", project_id=project_id)
+    logger.info("generate_triggered", project_id=project_id, org_id=tenant.org_id)
     return {
         "status": "accepted",
         "project_id": project_id,
@@ -34,8 +45,12 @@ async def trigger_generate(project_id: str, background_tasks: BackgroundTasks) -
 
 
 @router.post("/api/projects/{project_id}/run")
-async def trigger_run(project_id: str, background_tasks: BackgroundTasks) -> dict[str, str]:
-    project = await project_repo.get(project_id)
+async def trigger_run(
+    project_id: str,
+    background_tasks: BackgroundTasks,
+    tenant: TenantContext = Depends(get_tenant),
+) -> dict[str, str]:
+    project = await project_repo.get(project_id, org_id=tenant.org_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -44,9 +59,10 @@ async def trigger_run(project_id: str, background_tasks: BackgroundTasks) -> dic
         project_id=project_id,
         url=project["url"],
         rules_yaml=project.get("rules_yaml", ""),
+        org_id=tenant.org_id,
     )
 
-    logger.info("run_triggered", project_id=project_id)
+    logger.info("run_triggered", project_id=project_id, org_id=tenant.org_id)
     return {
         "status": "accepted",
         "project_id": project_id,

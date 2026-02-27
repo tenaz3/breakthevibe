@@ -11,6 +11,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
 
+from breakthevibe.config.settings import SENTINEL_ORG_ID
 from breakthevibe.models.database import CrawlRun, Project, TestCase, TestResult, TestRun
 
 logger = structlog.get_logger(__name__)
@@ -30,6 +31,7 @@ class DatabaseProjectRepository:
         """Convert a Project ORM instance to a plain dict."""
         return {
             "id": str(project.id),
+            "org_id": project.org_id,
             "name": project.name,
             "url": project.url,
             "rules_yaml": project.config_yaml or "",
@@ -38,40 +40,54 @@ class DatabaseProjectRepository:
             "status": "created",
         }
 
-    async def create(self, name: str, url: str, rules_yaml: str = "") -> dict[str, Any]:
+    async def create(
+        self,
+        name: str,
+        url: str,
+        rules_yaml: str = "",
+        org_id: str = SENTINEL_ORG_ID,
+    ) -> dict[str, Any]:
         async with AsyncSession(self._engine) as session:
-            project = Project(name=name, url=url, config_yaml=rules_yaml or None)
+            project = Project(name=name, url=url, config_yaml=rules_yaml or None, org_id=org_id)
             session.add(project)
             await session.commit()
             await session.refresh(project)
             result = self._to_dict(project)
-            logger.info("project_created", id=result["id"], name=name)
+            logger.info("project_created", id=result["id"], name=name, org_id=org_id)
             return result
 
-    async def list_all(self) -> list[dict[str, Any]]:
+    async def list_all(self, org_id: str = SENTINEL_ORG_ID) -> list[dict[str, Any]]:
         async with AsyncSession(self._engine) as session:
-            statement = select(Project).order_by(Project.created_at.desc())  # type: ignore[attr-defined]
+            statement = (
+                select(Project)
+                .where(col(Project.org_id) == org_id)
+                .order_by(Project.created_at.desc())  # type: ignore[attr-defined]
+            )
             results = await session.execute(statement)
             return [self._to_dict(p) for p in results.scalars().all()]
 
-    async def get(self, project_id: str) -> dict[str, Any] | None:
+    async def get(self, project_id: str, org_id: str = SENTINEL_ORG_ID) -> dict[str, Any] | None:
         try:
             pid = int(project_id)
         except (ValueError, TypeError):
             return None
         async with AsyncSession(self._engine) as session:
-            project = await session.get(Project, pid)
+            statement = select(Project).where(col(Project.id) == pid, col(Project.org_id) == org_id)
+            result = await session.execute(statement)
+            project = result.scalars().first()
             if not project:
                 return None
             return self._to_dict(project)
 
-    async def delete(self, project_id: str) -> bool:
+    async def delete(self, project_id: str, org_id: str = SENTINEL_ORG_ID) -> bool:
         try:
             pid = int(project_id)
         except (ValueError, TypeError):
             return False
         async with AsyncSession(self._engine) as session:
-            project = await session.get(Project, pid)
+            statement = select(Project).where(col(Project.id) == pid, col(Project.org_id) == org_id)
+            result = await session.execute(statement)
+            project = result.scalars().first()
             if not project:
                 return False
 
@@ -100,16 +116,20 @@ class DatabaseProjectRepository:
 
             await session.delete(project)
             await session.commit()
-            logger.info("project_deleted", id=project_id)
+            logger.info("project_deleted", id=project_id, org_id=org_id)
             return True
 
-    async def update(self, project_id: str, **updates: Any) -> dict[str, Any] | None:
+    async def update(
+        self, project_id: str, org_id: str = SENTINEL_ORG_ID, **updates: Any
+    ) -> dict[str, Any] | None:
         try:
             pid = int(project_id)
         except (ValueError, TypeError):
             return None
         async with AsyncSession(self._engine) as session:
-            project = await session.get(Project, pid)
+            statement = select(Project).where(col(Project.id) == pid, col(Project.org_id) == org_id)
+            result = await session.execute(statement)
+            project = result.scalars().first()
             if not project:
                 return None
             if "name" in updates:
@@ -121,9 +141,9 @@ class DatabaseProjectRepository:
             session.add(project)
             await session.commit()
             await session.refresh(project)
-            result = self._to_dict(project)
+            out = self._to_dict(project)
             # Merge extra non-DB fields into the result dict
             for key in ("status", "last_run_id", "last_run_at"):
                 if key in updates:
-                    result[key] = updates[key]
-            return result
+                    out[key] = updates[key]
+            return out

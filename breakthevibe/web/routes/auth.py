@@ -26,7 +26,7 @@ async def login_page(request: Request) -> HTMLResponse:
     token = request.cookies.get("session")
     if token and auth.validate_session(token):
         return RedirectResponse(url="/", status_code=302)  # type: ignore[return-value]
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request, "login.html")
 
 
 class LoginRequest(BaseModel):

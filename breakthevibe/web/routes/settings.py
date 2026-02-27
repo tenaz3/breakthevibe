@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from breakthevibe.generator.rules.schema import RulesConfig
+from breakthevibe.web.auth.rbac import get_tenant
 from breakthevibe.web.dependencies import llm_settings_repo, project_repo
+
+if TYPE_CHECKING:
+    from breakthevibe.web.tenant_context import TenantContext
 
 logger = structlog.get_logger(__name__)
 
@@ -26,14 +30,18 @@ class ValidateRulesRequest(BaseModel):
 
 
 @router.get("/projects/{project_id}/rules", response_class=HTMLResponse)
-async def rules_editor_page(request: Request, project_id: str) -> HTMLResponse:
-    project = await project_repo.get(project_id)
+async def rules_editor_page(
+    request: Request,
+    project_id: str,
+    tenant: TenantContext = Depends(get_tenant),
+) -> HTMLResponse:
+    project = await project_repo.get(project_id, org_id=tenant.org_id)
     if not project:
         return HTMLResponse(content="Project not found", status_code=404)
     return templates.TemplateResponse(
+        request,
         "rules_editor.html",
         {
-            "request": request,
             "project": project,
             "rules_yaml": project.get("rules_yaml", ""),
         },
@@ -41,8 +49,12 @@ async def rules_editor_page(request: Request, project_id: str) -> HTMLResponse:
 
 
 @router.put("/api/projects/{project_id}/rules")
-async def update_rules(project_id: str, request: Request) -> dict[str, str]:
-    project = await project_repo.get(project_id)
+async def update_rules(
+    project_id: str,
+    request: Request,
+    tenant: TenantContext = Depends(get_tenant),
+) -> dict[str, str]:
+    project = await project_repo.get(project_id, org_id=tenant.org_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     form = await request.form()
@@ -51,7 +63,7 @@ async def update_rules(project_id: str, request: Request) -> dict[str, str]:
         RulesConfig.from_yaml(str(rules_yaml))
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Invalid YAML: {e}") from e
-    await project_repo.update(project_id, rules_yaml=str(rules_yaml))
+    await project_repo.update(project_id, org_id=tenant.org_id, rules_yaml=str(rules_yaml))
     return {"status": "saved"}
 
 
@@ -65,15 +77,19 @@ async def validate_rules(body: ValidateRulesRequest) -> dict[str, str | bool]:
 
 
 @router.get("/settings/llm", response_class=HTMLResponse)
-async def llm_settings_page(request: Request) -> HTMLResponse:
-    settings = await llm_settings_repo.get_all()
-    return templates.TemplateResponse(
-        "llm_settings.html", {"request": request, "settings": settings}
-    )
+async def llm_settings_page(
+    request: Request,
+    tenant: TenantContext = Depends(get_tenant),
+) -> HTMLResponse:
+    settings = await llm_settings_repo.get_all(org_id=tenant.org_id)
+    return templates.TemplateResponse(request, "llm_settings.html", {"settings": settings})
 
 
 @router.put("/api/settings/llm")
-async def update_llm_settings(request: Request) -> dict[str, str]:
+async def update_llm_settings(
+    request: Request,
+    tenant: TenantContext = Depends(get_tenant),
+) -> dict[str, str]:
     form = await request.form()
     updates: dict[str, Any] = {}
     if form.get("default_provider"):
@@ -90,7 +106,7 @@ async def update_llm_settings(request: Request) -> dict[str, str]:
         updates["ollama_base_url"] = str(form["ollama_base_url"])
 
     # Per-module settings are stored as nested dicts
-    current = await llm_settings_repo.get_all()
+    current = await llm_settings_repo.get_all(org_id=tenant.org_id)
     modules = current.get("modules", {})
     for module in ["mapper", "generator", "agent"]:
         provider = form.get(f"modules_{module}_provider")
@@ -101,6 +117,6 @@ async def update_llm_settings(request: Request) -> dict[str, str]:
             modules.setdefault(module, {})["model"] = str(model)
     updates["modules"] = modules
 
-    await llm_settings_repo.set_many(updates)
-    logger.info("llm_settings_updated")
+    await llm_settings_repo.set_many(updates, org_id=tenant.org_id)
+    logger.info("llm_settings_updated", org_id=tenant.org_id)
     return {"status": "saved"}

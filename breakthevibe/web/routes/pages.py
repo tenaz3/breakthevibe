@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from breakthevibe.web.dependencies import pipeline_results, project_repo
+from breakthevibe.web.auth.rbac import get_tenant
+from breakthevibe.web.dependencies import _cache_key, pipeline_results, project_repo
+
+if TYPE_CHECKING:
+    from breakthevibe.web.tenant_context import TenantContext
 
 router = APIRouter(tags=["pages"])
 
@@ -18,72 +22,90 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templa
 
 
 @router.get("/", response_class=HTMLResponse)
-async def projects_page(request: Request) -> HTMLResponse:
-    projects = await project_repo.list_all()
-    return templates.TemplateResponse("projects.html", {"request": request, "projects": projects})
+async def projects_page(
+    request: Request,
+    tenant: TenantContext = Depends(get_tenant),
+) -> HTMLResponse:
+    projects = await project_repo.list_all(org_id=tenant.org_id)
+    return templates.TemplateResponse(request, "projects.html", {"projects": projects})
 
 
 @router.get("/projects/{project_id}", response_class=HTMLResponse)
-async def project_detail_page(request: Request, project_id: str) -> HTMLResponse:
-    project = await project_repo.get(project_id)
+async def project_detail_page(
+    request: Request,
+    project_id: str,
+    tenant: TenantContext = Depends(get_tenant),
+) -> HTMLResponse:
+    project = await project_repo.get(project_id, org_id=tenant.org_id)
     if not project:
         return HTMLResponse(content="Project not found", status_code=404)
-    return templates.TemplateResponse(
-        "project_detail.html", {"request": request, "project": project}
-    )
+    return templates.TemplateResponse(request, "project_detail.html", {"project": project})
 
 
 @router.get("/projects/{project_id}/sitemap", response_class=HTMLResponse)
-async def sitemap_page(request: Request, project_id: str) -> HTMLResponse:
-    project = await project_repo.get(project_id)
+async def sitemap_page(
+    request: Request,
+    project_id: str,
+    tenant: TenantContext = Depends(get_tenant),
+) -> HTMLResponse:
+    project = await project_repo.get(project_id, org_id=tenant.org_id)
     if not project:
         return HTMLResponse(content="Project not found", status_code=404)
-    return templates.TemplateResponse("sitemap.html", {"request": request, "project": project})
+    return templates.TemplateResponse(request, "sitemap.html", {"project": project})
 
 
 @router.get("/projects/{project_id}/runs", response_class=HTMLResponse)
-async def test_runs_page(request: Request, project_id: str) -> HTMLResponse:
-    project = await project_repo.get(project_id)
+async def test_runs_page(
+    request: Request,
+    project_id: str,
+    tenant: TenantContext = Depends(get_tenant),
+) -> HTMLResponse:
+    project = await project_repo.get(project_id, org_id=tenant.org_id)
     if not project:
         return HTMLResponse(content="Project not found", status_code=404)
-    # Build a list of runs for the template (currently one run per project in memory)
-    result = pipeline_results.get(project_id, {})
+    key = _cache_key(tenant.org_id, project_id)
+    result = pipeline_results.get(key, {})
     runs = []
     if result.get("run_id"):
         runs.append(
             {
                 "run_id": result["run_id"],
-                "status": result.get("status", "passed" if result.get("success") else "failed"),
+                "status": result.get(
+                    "status",
+                    "passed" if result.get("success") else "failed",
+                ),
                 "total": result.get("total", 0),
                 "passed": result.get("passed", 0),
                 "failed": result.get("failed", 0),
             }
         )
-    return templates.TemplateResponse(
-        "test_runs.html", {"request": request, "project": project, "runs": runs}
-    )
+    return templates.TemplateResponse(request, "test_runs.html", {"project": project, "runs": runs})
 
 
 @router.get("/projects/{project_id}/suites", response_class=HTMLResponse)
-async def test_suites_page(request: Request, project_id: str, category: str = "") -> HTMLResponse:
+async def test_suites_page(
+    request: Request,
+    project_id: str,
+    category: str = "",
+    tenant: TenantContext = Depends(get_tenant),
+) -> HTMLResponse:
     """Test suite browser — browse by route/category, edit rules inline (#16)."""
-    project = await project_repo.get(project_id)
+    project = await project_repo.get(project_id, org_id=tenant.org_id)
     if not project:
         return HTMLResponse(content="Project not found", status_code=404)
 
-    result = pipeline_results.get(project_id, {})
+    key = _cache_key(tenant.org_id, project_id)
+    result = pipeline_results.get(key, {})
     suites = result.get("suites", [])
 
     # Group suites by route, optionally filtering by category
     suites_by_route: dict[str, list[dict[str, Any]]] = {}
     for s in suites:
         suite_name: str = s.get("name", "unknown")
-        # Infer category from suite name suffix (e.g., "home_functional" -> "functional")
         parts = suite_name.rsplit("_", 1)
         suite_category = parts[-1] if len(parts) > 1 else "functional"
         if category and suite_category != category:
             continue
-        # Infer route from suite name prefix
         route = "/" + parts[0].replace("_", "/") if len(parts) > 1 else "/" + suite_name
         suite_entry = {
             "name": suite_name,
@@ -94,9 +116,9 @@ async def test_suites_page(request: Request, project_id: str, category: str = ""
         suites_by_route.setdefault(route, []).append(suite_entry)
 
     return templates.TemplateResponse(
+        request,
         "test_suites.html",
         {
-            "request": request,
             "project": project,
             "suites_by_route": suites_by_route,
             "category": category,
@@ -106,15 +128,19 @@ async def test_suites_page(request: Request, project_id: str, category: str = ""
 
 
 @router.get("/runs/{run_id}", response_class=HTMLResponse)
-async def test_result_detail_page(request: Request, run_id: str) -> HTMLResponse:
-    # Find the result matching this run_id
+async def test_result_detail_page(
+    request: Request,
+    run_id: str,
+    tenant: TenantContext = Depends(get_tenant),
+) -> HTMLResponse:
+    # Find the result matching this run_id (scoped to tenant)
     result: dict[str, Any] = {}
-    for _pid, res in pipeline_results.items():
-        if res.get("run_id") == run_id:
+    prefix = f"{tenant.org_id}:"
+    for key, res in pipeline_results.items():
+        if key.startswith(prefix) and res.get("run_id") == run_id:
             result = res
             break
 
-    # Extract template variables from report data
     suites = result.get("suites", [])
     status = result.get("status", "passed" if result.get("success") else "failed")
     total = result.get("total", len(suites))
@@ -123,7 +149,6 @@ async def test_result_detail_page(request: Request, run_id: str) -> HTMLResponse
     duration = f"{result.get('duration_seconds', 0):.1f}s"
     heal_warnings = result.get("heal_warnings", [])
 
-    # Build step replay data for JS (field names match replay.js expectations)
     replay_steps = []
     for suite in suites:
         for step in suite.get("step_captures", []):
@@ -136,10 +161,8 @@ async def test_result_detail_page(request: Request, run_id: str) -> HTMLResponse
                 }
             )
 
-    # Collect visual diff images from suites
     diffs = result.get("diffs", [])
 
-    # Find video URL from the first suite that has one
     video_url = result.get("video_url")
     if not video_url:
         for suite in suites:
@@ -151,9 +174,9 @@ async def test_result_detail_page(request: Request, run_id: str) -> HTMLResponse
                 break
 
     return templates.TemplateResponse(
+        request,
         "test_result_detail.html",
         {
-            "request": request,
             "run_id": run_id,
             "result": result,
             "status": status,
