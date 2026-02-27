@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, HttpUrl
 
+from breakthevibe.audit.logger import audit
 from breakthevibe.config.settings import get_settings
 from breakthevibe.utils.sanitize import is_safe_url
 from breakthevibe.web.auth.rbac import get_tenant
@@ -41,6 +42,7 @@ class ProjectResponse(BaseModel):
 @router.post("", status_code=201, response_model=ProjectResponse)
 async def create_project(
     body: CreateProjectRequest,
+    request: Request,
     tenant: TenantContext = Depends(get_tenant),
 ) -> dict[str, Any]:
     settings = get_settings()
@@ -54,6 +56,16 @@ async def create_project(
         url=str(body.url),
         rules_yaml=body.rules_yaml,
         org_id=tenant.org_id,
+    )
+    await audit(
+        org_id=tenant.org_id,
+        user_id=tenant.user_id,
+        action="project.created",
+        resource_type="project",
+        resource_id=str(project.get("id", "")),
+        details={"name": body.name, "url": str(body.url)},
+        ip_address=request.client.host if request.client else "",
+        request_id=request.headers.get("x-request-id", ""),
     )
     return project
 
@@ -79,9 +91,19 @@ async def get_project(
 @router.delete("/{project_id}")
 async def delete_project(
     project_id: str,
+    request: Request,
     tenant: TenantContext = Depends(get_tenant),
 ) -> Response:
     deleted = await project_repo.delete(project_id, org_id=tenant.org_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Project not found")
+    await audit(
+        org_id=tenant.org_id,
+        user_id=tenant.user_id,
+        action="project.deleted",
+        resource_type="project",
+        resource_id=project_id,
+        ip_address=request.client.host if request.client else "",
+        request_id=request.headers.get("x-request-id", ""),
+    )
     return Response(status_code=204)

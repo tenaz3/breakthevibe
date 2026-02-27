@@ -208,6 +208,26 @@ class PipelineJob(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utc_now)
 
 
+# ---------------------------------------------------------------------------
+# Audit logging
+# ---------------------------------------------------------------------------
+
+
+class AuditLog(SQLModel, table=True):
+    __tablename__ = "audit_logs"
+
+    id: str = Field(default_factory=_new_uuid, primary_key=True)
+    org_id: str = Field(index=True)
+    user_id: str = Field(default="")
+    action: str = Field(index=True)  # e.g. project.created, auth.login
+    resource_type: str = ""  # e.g. project, pipeline, settings
+    resource_id: str = ""
+    details_json: str = "{}"
+    ip_address: str = ""
+    request_id: str = ""
+    created_at: datetime = Field(default_factory=_utc_now)
+
+
 class LlmSetting(SQLModel, table=True):
     __tablename__ = "llm_settings"
 

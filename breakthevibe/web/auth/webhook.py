@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Request
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from breakthevibe.audit.logger import audit
 from breakthevibe.config.settings import get_settings
 from breakthevibe.models.database import Organization, OrganizationMembership, User
 from breakthevibe.storage.database import get_engine
@@ -232,6 +233,13 @@ async def _handle_membership_created(data: dict[str, Any]) -> None:
         else:
             session.add(OrganizationMembership(org_id=org.id, user_id=user.id, role=mapped_role))
         await session.commit()
+    await audit(
+        org_id=clerk_org_id,
+        user_id=clerk_user_id,
+        action="member.joined",
+        resource_type="membership",
+        details={"role": mapped_role},
+    )
     logger.info("membership_synced", clerk_org_id=clerk_org_id, clerk_user_id=clerk_user_id)
 
 
@@ -264,6 +272,12 @@ async def _handle_membership_deleted(data: dict[str, Any]) -> None:
             if membership:
                 await session.delete(membership)
                 await session.commit()
+    await audit(
+        org_id=clerk_org_id,
+        user_id=clerk_user_id,
+        action="member.removed",
+        resource_type="membership",
+    )
     logger.info("membership_removed", clerk_org_id=clerk_org_id, clerk_user_id=clerk_user_id)
 
 

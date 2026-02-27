@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 
+from breakthevibe.audit.logger import audit
 from breakthevibe.web.auth.rbac import get_tenant
 from breakthevibe.web.dependencies import (
     _cache_key,
@@ -27,6 +28,7 @@ router = APIRouter(tags=["crawl"])
 async def trigger_crawl(
     project_id: str,
     background_tasks: BackgroundTasks,
+    request: Request,
     tenant: TenantContext = Depends(get_tenant),
 ) -> dict[str, str]:
     project = await project_repo.get(project_id, org_id=tenant.org_id)
@@ -42,6 +44,16 @@ async def trigger_crawl(
     )
 
     await project_repo.update(project_id, org_id=tenant.org_id, status="crawling")
+    await audit(
+        org_id=tenant.org_id,
+        user_id=tenant.user_id,
+        action="pipeline.started",
+        resource_type="project",
+        resource_id=project_id,
+        details={"trigger": "crawl", "url": project["url"]},
+        ip_address=request.client.host if request.client else "",
+        request_id=request.headers.get("x-request-id", ""),
+    )
     logger.info("crawl_triggered", project_id=project_id, org_id=tenant.org_id)
     return {
         "status": "accepted",

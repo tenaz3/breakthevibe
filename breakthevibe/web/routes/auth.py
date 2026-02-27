@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from breakthevibe.audit.logger import audit
 from breakthevibe.web.auth.session import get_session_auth
 
 logger = structlog.get_logger(__name__)
@@ -35,7 +36,7 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/api/auth/login")
-async def login(body: LoginRequest, response: Response) -> dict[str, str]:
+async def login(body: LoginRequest, request: Request, response: Response) -> dict[str, str]:
     """Create a session for the user.
 
     When ADMIN_USERNAME/ADMIN_PASSWORD are set, validates credentials.
@@ -44,7 +45,7 @@ async def login(body: LoginRequest, response: Response) -> dict[str, str]:
     if not body.username or not body.password:
         raise HTTPException(status_code=400, detail="Username and password required")
 
-    from breakthevibe.config.settings import get_settings
+    from breakthevibe.config.settings import SENTINEL_ORG_ID, get_settings
 
     settings = get_settings()
     if (
@@ -65,6 +66,13 @@ async def login(body: LoginRequest, response: Response) -> dict[str, str]:
         samesite="lax",
         max_age=86400,
     )
+    await audit(
+        org_id=SENTINEL_ORG_ID,
+        user_id=body.username,
+        action="auth.login",
+        ip_address=request.client.host if request.client else "",
+        request_id=request.headers.get("x-request-id", ""),
+    )
     logger.info("user_logged_in", username=body.username)
     return {"status": "ok", "username": body.username}
 
@@ -72,9 +80,18 @@ async def login(body: LoginRequest, response: Response) -> dict[str, str]:
 @router.post("/api/auth/logout")
 async def logout(request: Request, response: Response) -> dict[str, str]:
     """Destroy the current session."""
+    from breakthevibe.config.settings import SENTINEL_ORG_ID
+
     auth = get_session_auth()
     token = request.cookies.get("session")
     if token:
         auth.destroy_session(token)
     response.delete_cookie("session")
+    await audit(
+        org_id=SENTINEL_ORG_ID,
+        user_id="",
+        action="auth.logout",
+        ip_address=request.client.host if request.client else "",
+        request_id=request.headers.get("x-request-id", ""),
+    )
     return {"status": "logged_out"}

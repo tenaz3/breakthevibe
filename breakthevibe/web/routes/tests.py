@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 
+from breakthevibe.audit.logger import audit
 from breakthevibe.web.auth.rbac import get_tenant
 from breakthevibe.web.dependencies import project_repo, run_pipeline
 
@@ -22,6 +23,7 @@ router = APIRouter(tags=["tests"])
 async def trigger_generate(
     project_id: str,
     background_tasks: BackgroundTasks,
+    request: Request,
     tenant: TenantContext = Depends(get_tenant),
 ) -> dict[str, str]:
     project = await project_repo.get(project_id, org_id=tenant.org_id)
@@ -36,6 +38,16 @@ async def trigger_generate(
         org_id=tenant.org_id,
     )
 
+    await audit(
+        org_id=tenant.org_id,
+        user_id=tenant.user_id,
+        action="pipeline.started",
+        resource_type="project",
+        resource_id=project_id,
+        details={"trigger": "generate"},
+        ip_address=request.client.host if request.client else "",
+        request_id=request.headers.get("x-request-id", ""),
+    )
     logger.info("generate_triggered", project_id=project_id, org_id=tenant.org_id)
     return {
         "status": "accepted",
@@ -48,6 +60,7 @@ async def trigger_generate(
 async def trigger_run(
     project_id: str,
     background_tasks: BackgroundTasks,
+    request: Request,
     tenant: TenantContext = Depends(get_tenant),
 ) -> dict[str, str]:
     project = await project_repo.get(project_id, org_id=tenant.org_id)
@@ -62,6 +75,16 @@ async def trigger_run(
         org_id=tenant.org_id,
     )
 
+    await audit(
+        org_id=tenant.org_id,
+        user_id=tenant.user_id,
+        action="pipeline.started",
+        resource_type="project",
+        resource_id=project_id,
+        details={"trigger": "run"},
+        ip_address=request.client.host if request.client else "",
+        request_id=request.headers.get("x-request-id", ""),
+    )
     logger.info("run_triggered", project_id=project_id, org_id=tenant.org_id)
     return {
         "status": "accepted",

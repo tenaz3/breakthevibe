@@ -79,9 +79,27 @@ class JobWorker:
                 org_id=job["org_id"],
             )
             await self._queue.complete(job_id)
+            await self._audit_job(job, "pipeline.completed")
         except Exception as exc:
             logger.error("job_failed", job_id=job_id, error=str(exc))
             await self._queue.complete(job_id, error=str(exc))
+            await self._audit_job(job, "pipeline.failed", error=str(exc))
+
+    async def _audit_job(self, job: dict[str, Any], action: str, error: str = "") -> None:
+        """Emit an audit log entry for a completed/failed job."""
+        from breakthevibe.audit.logger import audit
+
+        details: dict[str, Any] = {"job_id": job["id"], "job_type": job.get("job_type", "")}
+        if error:
+            details["error"] = error[:500]
+        await audit(
+            org_id=job["org_id"],
+            user_id="worker",
+            action=action,
+            resource_type="pipeline_job",
+            resource_id=job["id"],
+            details=details,
+        )
 
     def _shutdown(self) -> None:
         """Signal handler for graceful shutdown."""

@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from breakthevibe.audit.logger import audit
 from breakthevibe.generator.rules.schema import RulesConfig
 from breakthevibe.web.auth.rbac import get_tenant
 from breakthevibe.web.dependencies import llm_settings_repo, project_repo
@@ -64,6 +65,15 @@ async def update_rules(
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Invalid YAML: {e}") from e
     await project_repo.update(project_id, org_id=tenant.org_id, rules_yaml=str(rules_yaml))
+    await audit(
+        org_id=tenant.org_id,
+        user_id=tenant.user_id,
+        action="settings.updated",
+        resource_type="project_rules",
+        resource_id=project_id,
+        ip_address=request.client.host if request.client else "",
+        request_id=request.headers.get("x-request-id", ""),
+    )
     return {"status": "saved"}
 
 
@@ -118,5 +128,14 @@ async def update_llm_settings(
     updates["modules"] = modules
 
     await llm_settings_repo.set_many(updates, org_id=tenant.org_id)
+    await audit(
+        org_id=tenant.org_id,
+        user_id=tenant.user_id,
+        action="settings.updated",
+        resource_type="llm_settings",
+        details={"keys_changed": list(updates.keys())},
+        ip_address=request.client.host if request.client else "",
+        request_id=request.headers.get("x-request-id", ""),
+    )
     logger.info("llm_settings_updated", org_id=tenant.org_id)
     return {"status": "saved"}
