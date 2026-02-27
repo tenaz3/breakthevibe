@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     admin_username: str | None = None
     admin_password: str | None = None
 
+    # Environment & CORS
+    environment: str = "development"
+    allowed_origins: list[str] = ["http://localhost:8000", "http://127.0.0.1:8000"]
+
     # SSRF
     allow_private_urls: bool = True
 

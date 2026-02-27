@@ -27,6 +27,7 @@ from breakthevibe.web.routes.results import router as results_router
 from breakthevibe.web.routes.settings import router as settings_router
 from breakthevibe.web.routes.sse import router as sse_router
 from breakthevibe.web.routes.tests import router as tests_router
+from breakthevibe.web.security_headers import SecurityHeadersMiddleware
 
 logger = structlog.get_logger(__name__)
 
@@ -58,11 +59,12 @@ def create_app() -> FastAPI:
     # Middleware (order matters — last added runs first)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
+        allow_origins=settings.allowed_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
     )
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RateLimitMiddleware, max_requests=60, window_seconds=60)
     app.add_middleware(RequestIDMiddleware)
 
@@ -71,8 +73,10 @@ def create_app() -> FastAPI:
 
     # Health check (public)
     @app.get("/api/health")
-    async def health_check() -> dict[str, str]:
-        return {"status": "healthy", "version": "0.1.0"}
+    async def health_check() -> dict[str, object]:
+        from breakthevibe.web.health import check_health
+
+        return await check_health()
 
     # Protected routes (require session auth — API returns 401, pages redirect to /login)
     protected = [
