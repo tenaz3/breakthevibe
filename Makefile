@@ -4,7 +4,7 @@ setup:
 	uv sync
 	playwright install chromium
 
-dev:
+dev: setup migrate
 	uv run uvicorn breakthevibe.web.app:create_app --factory --reload
 
 test:
