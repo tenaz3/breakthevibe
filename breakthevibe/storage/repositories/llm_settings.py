@@ -22,9 +22,9 @@ _DEFAULTS: dict[str, Any] = {
     "default_provider": "anthropic",
     "default_model": "claude-sonnet-4-20250514",
     "modules": {
-        "mapper": {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
-        "generator": {"provider": "anthropic", "model": "claude-opus-4-0-20250115"},
-        "agent": {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
+        "mapper": {"provider": "", "model": ""},
+        "generator": {"provider": "", "model": ""},
+        "agent": {"provider": "", "model": ""},
     },
     "providers": {
         "anthropic": {"api_key": ""},

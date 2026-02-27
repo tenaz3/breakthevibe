@@ -75,10 +75,10 @@ class TestGeminiProviderGenerate:
             mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
             mock_genai.Client.return_value = mock_client
 
-            provider = GeminiProvider(api_key="test-key", model="gemini-2.5-pro-preview-06-05")
+            provider = GeminiProvider(api_key="test-key", model="gemini-2.5-pro")
             result = await provider.generate("Hi")
 
-        assert result.model == "gemini-2.5-pro-preview-06-05"
+        assert result.model == "gemini-2.5-pro"
 
     @pytest.mark.asyncio
     async def test_generate_tokens_used_is_sum(self) -> None:
@@ -118,11 +118,11 @@ class TestGeminiProviderGenerate:
             mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
             mock_genai.Client.return_value = mock_client
 
-            provider = GeminiProvider(api_key="test-key", model="gemini-2.0-flash-lite")
+            provider = GeminiProvider(api_key="test-key", model="gemini-2.5-flash-lite")
             await provider.generate("Test")
 
             call_kwargs = mock_client.aio.models.generate_content.call_args.kwargs
-            assert call_kwargs["model"] == "gemini-2.0-flash-lite"
+            assert call_kwargs["model"] == "gemini-2.5-flash-lite"
 
     @pytest.mark.asyncio
     async def test_generate_passes_system_instruction(self) -> None:
@@ -184,7 +184,7 @@ class TestGeminiProviderGenerate:
             await provider.generate("Test")
 
             call_kwargs = mock_client.aio.models.generate_content.call_args.kwargs
-            assert call_kwargs["model"] == "gemini-2.0-flash"
+            assert call_kwargs["model"] == "gemini-2.5-flash"
 
     @pytest.mark.asyncio
     async def test_client_initialised_with_api_key(self) -> None:
@@ -229,7 +229,7 @@ class TestGeminiProviderGenerateStructured:
         assert result.content == '{"result": "ok"}'
 
     @pytest.mark.asyncio
-    async def test_generate_structured_appends_json_instruction(self) -> None:
+    async def test_generate_structured_uses_json_mime_type(self) -> None:
         mock_response = _make_mock_response(text="{}")
 
         with patch("breakthevibe.llm.gemini_provider.genai") as mock_genai:
@@ -242,11 +242,11 @@ class TestGeminiProviderGenerateStructured:
 
             call_kwargs = mock_client.aio.models.generate_content.call_args.kwargs
             config = call_kwargs["config"]
-            assert "JSON" in config.system_instruction
-            assert "Be concise" in config.system_instruction
+            assert config.response_mime_type == "application/json"
+            assert config.system_instruction == "Be concise"
 
     @pytest.mark.asyncio
-    async def test_generate_structured_without_system_adds_json_instruction(self) -> None:
+    async def test_generate_structured_without_system_omits_instruction(self) -> None:
         mock_response = _make_mock_response(text="{}")
 
         with patch("breakthevibe.llm.gemini_provider.genai") as mock_genai:
@@ -259,4 +259,5 @@ class TestGeminiProviderGenerateStructured:
 
             call_kwargs = mock_client.aio.models.generate_content.call_args.kwargs
             config = call_kwargs["config"]
-            assert "JSON" in config.system_instruction
+            assert config.response_mime_type == "application/json"
+            assert not hasattr(config, "system_instruction") or config.system_instruction is None
