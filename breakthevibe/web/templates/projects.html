@@ -3,11 +3,22 @@
 {% block content %}
 <div class="flex items-center justify-between mb-6">
     <h1>Projects</h1>
-    <button class="btn btn-primary"
-            onclick="document.getElementById('new-project-form').classList.toggle('hidden')">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-        New Project
-    </button>
+    <div class="flex items-center gap-2">
+        <!-- View toggle -->
+        <div class="flex border border-border rounded-md overflow-hidden">
+            <button id="view-grid" class="btn-view-toggle active" onclick="setView('grid')" aria-label="Grid view">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            </button>
+            <button id="view-list" class="btn-view-toggle" onclick="setView('list')" aria-label="List view">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+            </button>
+        </div>
+        <button class="btn btn-primary"
+                onclick="document.getElementById('new-project-form').classList.toggle('hidden')">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+            New Project
+        </button>
+    </div>
 </div>
 
 <!-- Create project form -->
@@ -36,7 +47,17 @@
     </form>
 </div>
 
-<!-- Project grid -->
+{% if not projects %}
+<div class="card">
+    <div class="empty-state">
+        <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"/></svg>
+        <p>No projects yet</p>
+        <p>Create one to get started.</p>
+    </div>
+</div>
+{% else %}
+
+<!-- Grid view -->
 <div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 stagger-children">
     {% for project in projects %}
     <div class="card card-interactive card-content" id="project-{{ project.id }}">
@@ -63,20 +84,105 @@
         </div>
     </div>
     {% endfor %}
-    {% if not projects %}
-    <div class="col-span-full card">
-        <div class="empty-state">
-            <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"/></svg>
-            <p>No projects yet</p>
-            <p>Create one to get started.</p>
-        </div>
-    </div>
-    {% endif %}
 </div>
+
+<!-- List view -->
+<div id="project-list" class="hidden">
+    <div class="table-wrapper">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>URL</th>
+                    <th>Status</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for project in projects %}
+                <tr id="project-list-{{ project.id }}">
+                    <td class="font-medium text-foreground">{{ project.name }}</td>
+                    <td class="text-muted-foreground truncate max-w-[280px]">{{ project.url }}</td>
+                    <td>
+                        <span class="badge
+                            {% if project.status == 'passed' or project.status == 'healthy' %}badge-success
+                            {% elif project.status == 'failed' %}badge-destructive
+                            {% elif project.status == 'running' %}badge-info
+                            {% else %}badge-secondary{% endif %}">
+                            {{ project.status }}
+                        </span>
+                    </td>
+                    <td class="text-right">
+                        <div class="flex justify-end gap-2">
+                            <a href="/projects/{{ project.id }}" class="btn btn-secondary btn-sm">View</a>
+                            <button class="btn btn-ghost btn-sm btn-icon text-muted-foreground hover:text-destructive"
+                                    onclick="deleteProject('{{ project.id }}', '{{ project.name }}')"
+                                    aria-label="Delete {{ project.name }}">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
+<style>
+.btn-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    color: var(--muted-foreground);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.btn-view-toggle:hover {
+    color: var(--foreground);
+    background: var(--accent);
+}
+.btn-view-toggle.active {
+    color: var(--foreground);
+    background: var(--secondary);
+}
+</style>
 <script>
+function setView(mode) {
+    var grid = document.getElementById('project-grid');
+    var list = document.getElementById('project-list');
+    var btnGrid = document.getElementById('view-grid');
+    var btnList = document.getElementById('view-list');
+    if (!grid || !list) return;
+
+    if (mode === 'list') {
+        grid.classList.add('hidden');
+        list.classList.remove('hidden');
+        btnGrid.classList.remove('active');
+        btnList.classList.add('active');
+    } else {
+        grid.classList.remove('hidden');
+        list.classList.add('hidden');
+        btnGrid.classList.add('active');
+        btnList.classList.remove('active');
+    }
+    localStorage.setItem('btv-project-view', mode);
+}
+
+/* Restore saved view preference */
+(function() {
+    var saved = localStorage.getItem('btv-project-view');
+    if (saved === 'list') setView('list');
+})();
+
 function deleteProject(id, name) {
     openConfirmDialog(
         'Delete project',
@@ -86,13 +192,16 @@ function deleteProject(id, name) {
             fetch('/api/projects/' + id, { method: 'DELETE' })
                 .then(function(res) {
                     if (res.ok) {
-                        var el = document.getElementById('project-' + id);
-                        if (el) {
-                            el.style.transition = 'opacity 0.2s, transform 0.2s';
-                            el.style.opacity = '0';
-                            el.style.transform = 'scale(0.95)';
-                            setTimeout(function() { el.remove(); }, 200);
-                        }
+                        var card = document.getElementById('project-' + id);
+                        var row = document.getElementById('project-list-' + id);
+                        [card, row].forEach(function(el) {
+                            if (el) {
+                                el.style.transition = 'opacity 0.2s, transform 0.2s';
+                                el.style.opacity = '0';
+                                el.style.transform = 'scale(0.95)';
+                                setTimeout(function() { el.remove(); }, 200);
+                            }
+                        });
                         showToast('Project deleted', 'success');
                     } else {
                         showToast('Failed to delete project');
