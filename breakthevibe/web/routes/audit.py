@@ -5,8 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import text
+from sqlmodel import col, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from breakthevibe.models.database import AuditLog
 from breakthevibe.web.auth.rbac import get_tenant, require_admin
 
 if TYPE_CHECKING:
@@ -28,27 +30,33 @@ async def list_audit_logs(
 
     engine = get_engine()
 
-    clauses = ["org_id = :org_id"]
-    params: dict[str, Any] = {"org_id": tenant.org_id, "limit": limit, "offset": offset}
-
+    stmt = (
+        select(AuditLog)
+        .where(col(AuditLog.org_id) == tenant.org_id)
+        .order_by(col(AuditLog.created_at).desc())
+        .limit(limit)
+        .offset(offset)
+    )
     if action:
-        clauses.append("action = :action")
-        params["action"] = action
+        stmt = stmt.where(col(AuditLog.action) == action)
     if resource_type:
-        clauses.append("resource_type = :resource_type")
-        params["resource_type"] = resource_type
+        stmt = stmt.where(col(AuditLog.resource_type) == resource_type)
 
-    where = " AND ".join(clauses)
-
-    async with engine.connect() as conn:
-        result = await conn.execute(
-            text(
-                f"SELECT id, org_id, user_id, action, resource_type, resource_id, "  # noqa: S608
-                f"details_json, ip_address, request_id, created_at "
-                f"FROM audit_logs WHERE {where} "
-                f"ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
-            ),
-            params,
-        )
-        rows = result.mappings().all()
-        return [dict(r) for r in rows]
+    async with AsyncSession(engine) as session:
+        result = await session.execute(stmt)
+        rows = result.scalars().all()
+        return [
+            {
+                "id": r.id,
+                "org_id": r.org_id,
+                "user_id": r.user_id,
+                "action": r.action,
+                "resource_type": r.resource_type,
+                "resource_id": r.resource_id,
+                "details_json": r.details_json,
+                "ip_address": r.ip_address,
+                "request_id": r.request_id,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]

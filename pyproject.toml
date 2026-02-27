@@ -79,6 +79,18 @@ filterwarnings = [
     "ignore::pytest.PytestCollectionWarning",
 ]
 
+[tool.coverage.run]
+source = ["breakthevibe"]
+omit = [
+    "breakthevibe/storage/migrations/*",
+    "breakthevibe/main.py",
+    "breakthevibe/worker/cli.py",
+    "breakthevibe/config/logging.py",
+]
+
+[tool.coverage.report]
+fail_under = 60
+
 [tool.bandit]
 exclude_dirs = ["tests", ".venv"]
 

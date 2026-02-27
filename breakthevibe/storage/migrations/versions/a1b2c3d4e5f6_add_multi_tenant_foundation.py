@@ -6,7 +6,7 @@ Create Date: 2026-02-26 18:00:00.000000
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 import sqlmodel.sql.sqltypes
@@ -14,9 +14,9 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "a1b2c3d4e5f6"
-down_revision: Union[str, Sequence[str], None] = "3a8565d6ccd1"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = "3a8565d6ccd1"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 SENTINEL_ORG_ID = "00000000-0000-0000-0000-000000000001"
 SENTINEL_USER_ID = "00000000-0000-0000-0000-000000000002"
@@ -30,7 +30,9 @@ def upgrade() -> None:
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("clerk_org_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("plan", sqlmodel.sql.sqltypes.AutoString(), nullable=False, server_default="free"),
+        sa.Column(
+            "plan", sqlmodel.sql.sqltypes.AutoString(), nullable=False, server_default="free"
+        ),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
@@ -120,12 +122,9 @@ def upgrade() -> None:
     )
 
     # --- 4. Backfill org_id with sentinel value ---
-    for table in tables:
-        op.execute(
-            sa.text(f"UPDATE {table} SET org_id = :org_id WHERE org_id IS NULL").bindparams(
-                org_id=SENTINEL_ORG_ID
-            )
-        )
+    for table_name in tables:
+        tbl = sa.table(table_name, sa.column("org_id"))
+        op.execute(tbl.update().where(tbl.c.org_id.is_(None)).values(org_id=SENTINEL_ORG_ID))
 
     # --- 5. Set NOT NULL and create indexes ---
     for table in tables:
