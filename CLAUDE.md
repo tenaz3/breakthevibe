@@ -133,3 +133,27 @@ tests/
 - Use parameterized queries (SQLModel/SQLAlchemy handles this)
 - Sanitize user input displayed in Jinja2 templates (auto-escaping is on)
 - SSRF protection: block private IPs in crawler
+
+## Design Context
+
+### Users
+QA Engineers running automated visual regression and functional test suites. They are technical, value precision, and need to trust that the tool found every issue. They work under time pressure and want automation that saves hours, not creates more work.
+
+### Brand Personality
+**Precise, Confident, Fast** — like Linear meets Vercel. Engineering-grade trust with zero fluff. The interface should feel like a sharp tool built by people who understand testing, not a marketing demo.
+
+### Aesthetic Direction
+- **Visual tone**: Modern Minimal — clean, sharp, data-dense where needed
+- **Theme**: Light-first with dark mode toggle (class-based `.dark`)
+- **Color palette**: Indigo-blue primary (`#4f5dd6`), semantic status colors (green/red/yellow/blue badges), tinted neutrals (never pure gray)
+- **Typography**: Inter for UI, JetBrains Mono for code/data — tight tracking, clear hierarchy
+- **References**: Raycast (snappy, polished, developer-focused), Playwright Trace Viewer (technical test results with timeline/screenshots/logs), Vercel Dashboard (clean deployment UI, real-time status)
+- **Anti-references**: Overly decorative SaaS dashboards, gradient-heavy marketing pages, anything that prioritizes aesthetics over information density
+- **Tech**: Tailwind CDN + custom CSS variables + HTMX for interactivity, Jinja2 SSR templates
+
+### Design Principles
+1. **Data over decoration** — Every pixel should communicate something useful. Status badges, pass/fail counts, and timestamps are more valuable than illustrations or empty whitespace.
+2. **Instant clarity** — A QA engineer glancing at any screen should know the state of things within 1 second. Use color, iconography, and layout to make status obvious.
+3. **Confidence through transparency** — Show what the tool is doing (SSE progress, stage indicators, log output). Never hide complexity behind a spinner — surface it.
+4. **Speed is a feature** — Interactions should feel instant. Use HTMX for partial updates, optimistic UI where safe, and avoid full-page reloads. Animations are functional (150-300ms, ease-out), never decorative.
+5. **Consistent and predictable** — Same patterns everywhere. Cards look the same, buttons behave the same, status colors mean the same thing. Surprise is the enemy of trust.

@@ -6,7 +6,7 @@
     {{ project.name }}
 </a>
 
-<div class="page-header mb-6">
+<div class="page-header">
     <h1>Test Suites</h1>
 </div>
 
@@ -63,7 +63,7 @@
                             </td>
                             <td class="text-muted-foreground">{{ suite.step_count }}</td>
                             <td class="text-right">
-                                <button class="btn btn-ghost btn-sm"
+                                <button type="button" class="btn btn-ghost btn-sm"
                                         onclick="toggleCode('code-{{ loop.index0 }}-{{ loop.parent.loop.index0 }}')">
                                     View Code
                                 </button>

@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Page
 
 from breakthevibe.models.domain import ComponentInfo, InteractionInfo, ResilientSelector
@@ -68,7 +69,7 @@ class ComponentExtractor:
         # Playwright accessibility tree for richer semantic structure
         try:
             self._a11y_snapshot = await page.accessibility.snapshot()  # type: ignore[attr-defined]
-        except Exception:
+        except (PlaywrightError, AttributeError):
             self._a11y_snapshot = None
 
         raw_elements: list[dict[str, Any]] = await page.evaluate(EXTRACT_JS)

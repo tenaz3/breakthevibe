@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Test Result — BreakTheVibe{% endblock %}
+{% block title %}Run {{ run_id[:8] }} — BreakTheVibe{% endblock %}
 {% block content %}
 <!-- Back link -->
-<a href="javascript:history.back()" class="back-link">
+<a href="/projects/{{ project_id }}" class="back-link">
     <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
     Back
 </a>
@@ -18,7 +18,6 @@
         {{ status }}
     </span>
 </div>
-<div class="mb-6"></div>
 
 <!-- Error banner -->
 {% if result and result.error_message %}
@@ -107,9 +106,9 @@
     </div>
     <div class="card-content">
         <div class="replay-controls mb-3">
-            <button class="btn btn-secondary btn-sm" id="replay-prev">Previous</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="replay-prev">Previous</button>
             <span id="replay-counter" class="text-[0.75rem] text-muted-foreground tabular-nums">0 / 0</span>
-            <button class="btn btn-secondary btn-sm" id="replay-next">Next</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="replay-next">Next</button>
         </div>
         <div id="replay-step-info" class="text-[0.8125rem] text-foreground"></div>
         <img id="replay-screenshot" class="replay-screenshot mt-3 hidden" src="" alt="Step screenshot">

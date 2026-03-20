@@ -6,7 +6,7 @@
     {{ project.name }}
 </a>
 
-<div class="page-header mb-6">
+<div class="page-header">
     <h1>Rules Editor</h1>
 </div>
 
@@ -81,8 +81,15 @@ document.getElementById('validate-btn')?.addEventListener('click', function() {
 });
 
 document.getElementById('reset-btn')?.addEventListener('click', function() {
-    document.querySelector('[name=rules_yaml]').value =
-        document.getElementById('default-config').textContent;
+    openConfirmDialog(
+        'Reset to Defaults',
+        'This will replace your current rules with the default configuration. Unsaved changes will be lost.',
+        'Reset',
+        function() {
+            document.querySelector('[name=rules_yaml]').value =
+                document.getElementById('default-config').textContent;
+        }
+    );
 });
 </script>
 {% endblock %}

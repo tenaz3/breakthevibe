@@ -1,12 +1,12 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: breakthevibe
       POSTGRES_PASSWORD: breakthevibe
       POSTGRES_DB: breakthevibe
     ports:
-      - "5432:5432"
+      - "5499:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +28,7 @@ services:
   app:
     build: .
     ports:
-      - "8000:8000"
+      - "8099:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://breakthevibe:breakthevibe@db:5432/breakthevibe
       USE_DATABASE: "true"

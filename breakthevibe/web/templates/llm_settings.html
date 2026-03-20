@@ -80,13 +80,13 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<div class="page-header mb-6">
+<div class="page-header">
     <h1>LLM Settings</h1>
 </div>
 
 <form id="llm-settings-form" hx-put="/api/settings/llm" hx-swap="none"
       hx-on::before-request="setSaveState('saving')"
-      hx-on::after-request="if(event.detail.successful){setSaveState('saved');showToast('Settings saved','success')}else{setSaveState('idle');showToast('Failed to save settings')}"
+      hx-on::after-request="if(event.detail.successful){setSaveState('saved');showToast('Settings saved','success')}else{setSaveState('failed');showToast('Failed to save settings')}"
       enctype="application/x-www-form-urlencoded"
       class="space-y-4 max-w-2xl">
 
@@ -123,8 +123,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 <legend>{{ module | capitalize }}</legend>
                 <div class="space-y-3 mt-2">
                     <div>
-                        <label class="label label-muted">Provider</label>
-                        <select name="modules_{{ module }}_provider" class="select">
+                        <label for="module-{{ module }}-provider" class="label label-muted">Provider</label>
+                        <select id="module-{{ module }}-provider" name="modules_{{ module }}_provider" class="select">
                             <option value="">Use default</option>
                             <option value="anthropic" {% if settings.modules[module].provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
                             <option value="openai" {% if settings.modules[module].provider == 'openai' %}selected{% endif %}>OpenAI</option>
@@ -133,8 +133,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         </select>
                     </div>
                     <div>
-                        <label class="label label-muted">Model</label>
-                        <select name="modules_{{ module }}_model" data-current="{{ settings.modules[module].model }}" class="select"></select>
+                        <label for="module-{{ module }}-model" class="label label-muted">Model</label>
+                        <select id="module-{{ module }}-model" name="modules_{{ module }}_model" data-current="{{ settings.modules[module].model }}" class="select"></select>
                     </div>
                 </div>
             </fieldset>
@@ -148,22 +148,22 @@ document.addEventListener('DOMContentLoaded', function() {
             <h3>API Keys</h3>
         </div>
         <div class="card-content space-y-4">
-            <p class="text-[0.8125rem] text-muted-foreground">In production, use environment variables (<span class="font-mono text-[0.75rem]">ANTHROPIC_API_KEY</span>, <span class="font-mono text-[0.75rem]">OPENAI_API_KEY</span>, <span class="font-mono text-[0.75rem]">GOOGLE_API_KEY</span>).</p>
+            <p id="api-keys-help" class="text-[0.8125rem] text-muted-foreground">In production, use environment variables (<span class="font-mono text-[0.75rem]">ANTHROPIC_API_KEY</span>, <span class="font-mono text-[0.75rem]">OPENAI_API_KEY</span>, <span class="font-mono text-[0.75rem]">GOOGLE_API_KEY</span>).</p>
             <div>
-                <label class="label">Anthropic API Key</label>
-                <input type="password" name="anthropic_api_key" placeholder="sk-ant-..." class="input">
+                <label for="anthropic-api-key" class="label">Anthropic API Key</label>
+                <input type="password" id="anthropic-api-key" name="anthropic_api_key" placeholder="sk-ant-..." class="input" aria-describedby="api-keys-help">
             </div>
             <div>
-                <label class="label">OpenAI API Key</label>
-                <input type="password" name="openai_api_key" placeholder="sk-..." class="input">
+                <label for="openai-api-key" class="label">OpenAI API Key</label>
+                <input type="password" id="openai-api-key" name="openai_api_key" placeholder="sk-..." class="input" aria-describedby="api-keys-help">
             </div>
             <div>
-                <label class="label">Google Gemini API Key</label>
-                <input type="password" name="google_api_key" placeholder="AIza..." class="input">
+                <label for="google-api-key" class="label">Google Gemini API Key</label>
+                <input type="password" id="google-api-key" name="google_api_key" placeholder="AIza..." class="input" aria-describedby="api-keys-help">
             </div>
             <div>
-                <label class="label">Ollama Base URL</label>
-                <input type="text" name="ollama_base_url" value="{{ settings.providers.ollama.base_url }}" class="input">
+                <label for="ollama-base-url" class="label">Ollama Base URL</label>
+                <input type="text" id="ollama-base-url" name="ollama_base_url" value="{{ settings.providers.ollama.base_url }}" class="input" aria-describedby="api-keys-help">
             </div>
         </div>
     </div>
@@ -178,6 +178,10 @@ document.addEventListener('DOMContentLoaded', function() {
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
             Saved
         </span>
+        <span id="save-failed" class="hidden items-center gap-2">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            Failed
+        </span>
     </button>
 </form>
 
@@ -187,11 +191,26 @@ function setSaveState(state) {
     var label = document.getElementById('save-label');
     var saving = document.getElementById('save-saving');
     var done = document.getElementById('save-done');
+    var failed = document.getElementById('save-failed');
 
     label.className = state === 'idle' ? '' : 'hidden';
     saving.className = state === 'saving' ? 'inline-flex items-center gap-2' : 'hidden';
     done.className = state === 'saved' ? 'inline-flex items-center gap-2' : 'hidden';
+    failed.className = state === 'failed' ? 'inline-flex items-center gap-2' : 'hidden';
     btn.disabled = state === 'saving';
+
+    if (state === 'failed') {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-destructive');
+        setTimeout(function() {
+            btn.classList.remove('btn-destructive');
+            btn.classList.add('btn-primary');
+            setSaveState('idle');
+        }, 2000);
+    } else {
+        btn.classList.remove('btn-destructive');
+        btn.classList.add('btn-primary');
+    }
 
     if (state === 'saved') {
         setTimeout(function() { setSaveState('idle'); }, 2000);
