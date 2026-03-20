@@ -42,12 +42,14 @@ logger = structlog.get_logger(__name__)
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Run startup tasks before the app begins serving requests."""
     settings = get_settings()
+    logger.info("app_startup", auth_mode=settings.auth_mode)
     if settings.auth_mode == "passkey":
         from breakthevibe.web.dependencies import user_repo
 
         await user_repo.ensure_sentinel_org()
         logger.info("passkey_bootstrap_ready", msg="sentinel org ensured")
     yield
+    logger.info("app_shutdown")
 
 
 def create_app() -> FastAPI:

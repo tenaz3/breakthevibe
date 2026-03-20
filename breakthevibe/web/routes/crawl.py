@@ -36,6 +36,7 @@ async def trigger_crawl(
         url=project["url"],
         rules_yaml=project.get("rules_yaml", ""),
         org_id=tenant.org_id,
+        request_id=request.headers.get("x-request-id"),
     )
 
     await project_repo.update(project_id, org_id=tenant.org_id, status="crawling")
@@ -59,17 +60,13 @@ async def trigger_crawl(
 
 @router.get("/api/projects/{project_id}/sitemap")
 async def get_sitemap(
-    project_id: str,
+    project_id: int,
     tenant: TenantContext = Depends(get_tenant),
 ) -> dict[str, Any]:
-    project = await project_repo.get(project_id, org_id=tenant.org_id)
+    project = await project_repo.get(str(project_id), org_id=tenant.org_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    try:
-        pid = int(project_id)
-    except (ValueError, TypeError):
-        return {"project_id": project_id, "pages": [], "api_endpoints": []}
-    sitemap = await crawl_run_repo.get_latest_sitemap(pid, org_id=tenant.org_id)
+    sitemap = await crawl_run_repo.get_latest_sitemap(project_id, org_id=tenant.org_id)
     if not sitemap:
         return {"project_id": project_id, "pages": [], "api_endpoints": []}
     return {

@@ -36,6 +36,7 @@ async def trigger_generate(
         url=project["url"],
         rules_yaml=project.get("rules_yaml", ""),
         org_id=tenant.org_id,
+        request_id=request.headers.get("x-request-id"),
     )
 
     await audit(
@@ -73,6 +74,7 @@ async def trigger_run(
         url=project["url"],
         rules_yaml=project.get("rules_yaml", ""),
         org_id=tenant.org_id,
+        request_id=request.headers.get("x-request-id"),
     )
 
     await audit(

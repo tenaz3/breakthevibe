@@ -48,15 +48,10 @@ async def get_run_results(
 
 @router.get("/api/projects/{project_id}/results")
 async def get_project_results(
-    project_id: str,
+    project_id: int,
     tenant: TenantContext = Depends(get_tenant),
 ) -> dict[str, Any]:
-    try:
-        pid = int(project_id)
-    except (ValueError, TypeError):
-        return {"project_id": project_id, "status": "no_runs"}
-
-    result = await test_run_repo.get_latest_for_project(pid, org_id=tenant.org_id)
+    result = await test_run_repo.get_latest_for_project(project_id, org_id=tenant.org_id)
     if not result:
         return {"project_id": project_id, "status": "no_runs"}
     return {

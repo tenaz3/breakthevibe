@@ -3,22 +3,19 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 
 from breakthevibe.web.auth.rbac import get_tenant
 from breakthevibe.web.dependencies import project_repo, test_run_repo
+from breakthevibe.web.template_engine import templates
 
 if TYPE_CHECKING:
     from breakthevibe.web.tenant_context import TenantContext
 
 router = APIRouter(tags=["pages"])
-
-templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -38,7 +35,16 @@ async def project_detail_page(
 ) -> HTMLResponse:
     project = await project_repo.get(project_id, org_id=tenant.org_id)
     if not project:
-        return HTMLResponse(content="Project not found", status_code=404)
+        return templates.TemplateResponse(
+            request,
+            "error.html",
+            {
+                "status_code": 404,
+                "title": "Project Not Found",
+                "message": "The project you requested could not be found.",
+            },
+            status_code=404,
+        )
     return templates.TemplateResponse(request, "project_detail.html", {"project": project})
 
 
@@ -50,44 +56,63 @@ async def sitemap_page(
 ) -> HTMLResponse:
     project = await project_repo.get(project_id, org_id=tenant.org_id)
     if not project:
-        return HTMLResponse(content="Project not found", status_code=404)
+        return templates.TemplateResponse(
+            request,
+            "error.html",
+            {
+                "status_code": 404,
+                "title": "Project Not Found",
+                "message": "The project you requested could not be found.",
+            },
+            status_code=404,
+        )
     return templates.TemplateResponse(request, "sitemap.html", {"project": project})
 
 
 @router.get("/projects/{project_id}/runs", response_class=HTMLResponse)
 async def test_runs_page(
     request: Request,
-    project_id: str,
+    project_id: int,
     tenant: TenantContext = Depends(get_tenant),
 ) -> HTMLResponse:
-    project = await project_repo.get(project_id, org_id=tenant.org_id)
+    project = await project_repo.get(str(project_id), org_id=tenant.org_id)
     if not project:
-        return HTMLResponse(content="Project not found", status_code=404)
-    try:
-        pid = int(project_id)
-    except (ValueError, TypeError):
-        pid = 0
-    runs = await test_run_repo.list_for_project(pid, org_id=tenant.org_id)
+        return templates.TemplateResponse(
+            request,
+            "error.html",
+            {
+                "status_code": 404,
+                "title": "Project Not Found",
+                "message": "The project you requested could not be found.",
+            },
+            status_code=404,
+        )
+    runs = await test_run_repo.list_for_project(project_id, org_id=tenant.org_id)
     return templates.TemplateResponse(request, "test_runs.html", {"project": project, "runs": runs})
 
 
 @router.get("/projects/{project_id}/suites", response_class=HTMLResponse)
 async def test_suites_page(
     request: Request,
-    project_id: str,
+    project_id: int,
     category: str = "",
     tenant: TenantContext = Depends(get_tenant),
 ) -> HTMLResponse:
     """Test suite browser — browse by route/category, edit rules inline (#16)."""
-    project = await project_repo.get(project_id, org_id=tenant.org_id)
+    project = await project_repo.get(str(project_id), org_id=tenant.org_id)
     if not project:
-        return HTMLResponse(content="Project not found", status_code=404)
+        return templates.TemplateResponse(
+            request,
+            "error.html",
+            {
+                "status_code": 404,
+                "title": "Project Not Found",
+                "message": "The project you requested could not be found.",
+            },
+            status_code=404,
+        )
 
-    try:
-        pid = int(project_id)
-    except (ValueError, TypeError):
-        pid = 0
-    result = await test_run_repo.get_latest_for_project(pid, org_id=tenant.org_id)
+    result = await test_run_repo.get_latest_for_project(project_id, org_id=tenant.org_id)
     suites: list[dict[str, Any]] = result.get("suites", []) if result else []
 
     # Group suites by route, optionally filtering by category
@@ -159,11 +184,14 @@ async def test_result_detail_page(
             if video_url:
                 break
 
+    project_id = result.get("project_id", "")
+
     return templates.TemplateResponse(
         request,
         "test_result_detail.html",
         {
             "run_id": run_id,
+            "project_id": project_id,
             "result": result,
             "status": status,
             "total": total,

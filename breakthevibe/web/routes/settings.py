@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import structlog
+import yaml
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from breakthevibe.audit.logger import audit
 from breakthevibe.generator.rules.schema import RulesConfig
 from breakthevibe.web.auth.rbac import get_tenant
 from breakthevibe.web.dependencies import llm_settings_repo, project_repo
+from breakthevibe.web.template_engine import templates
 
 if TYPE_CHECKING:
     from breakthevibe.web.tenant_context import TenantContext
@@ -22,8 +22,6 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["settings"])
-
-templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 
 
 class ValidateRulesRequest(BaseModel):
@@ -60,9 +58,11 @@ async def update_rules(
         raise HTTPException(status_code=404, detail="Project not found")
     form = await request.form()
     rules_yaml = form.get("rules_yaml", "")
+    if len(str(rules_yaml)) > 65536:
+        raise HTTPException(status_code=413, detail="Rules YAML too large")
     try:
         RulesConfig.from_yaml(str(rules_yaml))
-    except Exception as e:
+    except (yaml.YAMLError, ValueError, ValidationError) as e:
         raise HTTPException(status_code=422, detail=f"Invalid YAML: {e}") from e
     await project_repo.update(project_id, org_id=tenant.org_id, rules_yaml=str(rules_yaml))
     await audit(
@@ -82,7 +82,7 @@ async def validate_rules(body: ValidateRulesRequest) -> dict[str, str | bool]:
     try:
         RulesConfig.from_yaml(body.yaml)
         return {"valid": True}
-    except Exception as e:
+    except (yaml.YAMLError, ValueError, ValidationError) as e:
         return {"valid": False, "error": str(e)}
 
 
