@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from breakthevibe.config.settings import SENTINEL_ORG_ID
@@ -65,6 +65,7 @@ class OrganizationMembership(SQLModel, table=True):
 
 class Project(SQLModel, table=True):
     __tablename__ = "projects"
+    __table_args__ = (Index("ix_projects_org_created", "org_id", "created_at"),)
 
     id: int | None = Field(default=None, primary_key=True)
     org_id: str = Field(default=SENTINEL_ORG_ID, index=True)
@@ -78,6 +79,9 @@ class Project(SQLModel, table=True):
 
 class CrawlRun(SQLModel, table=True):
     __tablename__ = "crawl_runs"
+    __table_args__ = (
+        Index("ix_crawl_runs_org_project_created", "org_id", "project_id", "created_at"),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
     org_id: str = Field(default=SENTINEL_ORG_ID, index=True)
@@ -123,6 +127,9 @@ class TestCase(SQLModel, table=True):
 
 class TestRun(SQLModel, table=True):
     __tablename__ = "test_runs"
+    __table_args__ = (
+        Index("ix_test_runs_org_project_created", "org_id", "project_id", "created_at"),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
     org_id: str = Field(default=SENTINEL_ORG_ID, index=True)
@@ -147,6 +154,7 @@ class TestRun(SQLModel, table=True):
 
 class TestResult(SQLModel, table=True):
     __tablename__ = "test_results"
+    __table_args__ = (Index("ix_test_results_run_status", "test_run_id", "status"),)
 
     id: int | None = Field(default=None, primary_key=True)
     org_id: str = Field(default=SENTINEL_ORG_ID, index=True)
@@ -198,33 +206,13 @@ class UsageRecord(SQLModel, table=True):
 
 
 # ---------------------------------------------------------------------------
-# Pipeline job queue
-# ---------------------------------------------------------------------------
-
-
-class PipelineJob(SQLModel, table=True):
-    __tablename__ = "pipeline_jobs"
-
-    id: str = Field(default_factory=_new_uuid, primary_key=True)
-    org_id: str = Field(index=True)
-    project_id: str
-    job_type: str = Field(default="full")  # full | crawl | generate | run
-    status: str = Field(default="pending")  # pending | running | completed | failed | canceled
-    url: str = ""
-    rules_yaml: str = ""
-    error_message: str | None = None
-    started_at: datetime | None = None
-    finished_at: datetime | None = None
-    created_at: datetime = Field(default_factory=_utc_now)
-
-
-# ---------------------------------------------------------------------------
 # Audit logging
 # ---------------------------------------------------------------------------
 
 
 class AuditLog(SQLModel, table=True):
     __tablename__ = "audit_logs"
+    __table_args__ = (Index("ix_audit_logs_org_created", "org_id", "created_at"),)
 
     id: str = Field(default_factory=_new_uuid, primary_key=True)
     org_id: str = Field(index=True)

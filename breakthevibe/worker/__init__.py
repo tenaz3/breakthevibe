@@ -1,1 +1,0 @@
-"""Pipeline job queue worker."""
