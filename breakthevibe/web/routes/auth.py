@@ -2,23 +2,21 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from breakthevibe.audit.logger import audit
 from breakthevibe.config.settings import SENTINEL_ORG_ID, get_settings
 from breakthevibe.web.auth.session import get_session_auth
+from breakthevibe.web.template_engine import templates
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["auth"])
-templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 
 
 # ---------------------------------------------------------------------------
@@ -80,11 +78,10 @@ async def login(body: LoginRequest, request: Request, response: Response) -> dic
     if not body.username or not body.password:
         raise HTTPException(status_code=400, detail="Username and password required")
 
-    if (
-        settings.admin_username
-        and settings.admin_password
-        and (body.username != settings.admin_username or body.password != settings.admin_password)
-    ):
+    if not settings.admin_username or not settings.admin_password:
+        raise HTTPException(status_code=503, detail="Authentication not configured")
+
+    if body.username != settings.admin_username or body.password != settings.admin_password:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     auth = get_session_auth()
@@ -196,6 +193,8 @@ async def passkey_register_complete(
             webauthn_user_id_hex=body.webauthn_user_id,
         )
     except Exception as exc:
+        # Broad catch: webauthn library raises a mix of ValueError, InvalidCBORData,
+        # InvalidAuthenticatorData, and other library-specific types at this boundary.
         logger.warning("passkey_registration_failed", error=str(exc))
         raise HTTPException(status_code=400, detail="Registration failed") from exc
 
@@ -287,6 +286,8 @@ async def passkey_authenticate_complete(
             challenge_key=body.challenge_key,
         )
     except Exception as exc:
+        # Broad catch: webauthn library raises a mix of ValueError, InvalidCBORData,
+        # InvalidSignature, and other library-specific types at this boundary.
         logger.warning("passkey_auth_failed", error=str(exc))
         raise HTTPException(status_code=400, detail="Authentication failed") from exc
 

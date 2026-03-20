@@ -17,6 +17,8 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql+asyncpg://breakthevibe:breakthevibe@localhost:5432/breakthevibe"
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
 
     # App
     secret_key: str = "change-me-in-production"
@@ -49,7 +51,7 @@ class Settings(BaseSettings):
     allowed_origins: list[str] = ["http://localhost:8000", "http://127.0.0.1:8000"]
 
     # SSRF
-    allow_private_urls: bool = True
+    allow_private_urls: bool = False
 
     # Object Storage (S3/R2)
     use_s3: bool = False
@@ -66,11 +68,22 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
 
 
+_DEFAULT_SECRET_KEY = "change-me-in-production"  # nosec B105
+
+
 @lru_cache
 def get_settings() -> Settings:
-    """Return cached settings instance."""
+    """Return cached settings instance.
+
+    Raises:
+        RuntimeError: When the default secret key is used outside of development.
+    """
     settings = Settings()
-    if settings.secret_key == "change-me-in-production":  # nosec B105
+    if settings.secret_key == _DEFAULT_SECRET_KEY:
+        if settings.environment != "development":
+            raise RuntimeError(
+                "SECRET_KEY must be changed from default for non-development environments"
+            )
         warnings.warn(
             "SECRET_KEY is using the insecure default. "
             "Set SECRET_KEY environment variable for production.",

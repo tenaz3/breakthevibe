@@ -6,13 +6,17 @@ import asyncio
 from typing import TYPE_CHECKING
 
 import structlog
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from breakthevibe.web.auth.rbac import get_tenant
+from breakthevibe.web.dependencies import project_repo
 from breakthevibe.web.sse import PipelineProgressEvent, progress_bus
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+    from breakthevibe.web.tenant_context import TenantContext
 
 logger = structlog.get_logger(__name__)
 
@@ -25,8 +29,12 @@ _HEARTBEAT_INTERVAL = 15.0  # seconds
 async def pipeline_progress_stream(
     project_id: str,
     request: Request,
+    tenant: TenantContext = Depends(get_tenant),
 ) -> StreamingResponse:
     """Stream pipeline stage progress as Server-Sent Events."""
+    project = await project_repo.get(project_id, org_id=tenant.org_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
 
     async def event_generator() -> AsyncGenerator[str, None]:
         q = progress_bus.subscribe(project_id)
