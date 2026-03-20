@@ -38,14 +38,35 @@ _SENSITIVE_FIELDS = frozenset(
 
 _MAX_DETAILS_BYTES = 10_240  # 10KB
 
+# Incremented on every audit write failure — queryable without external metrics
+_audit_failures: int = 0
+
 
 def _sanitize_details(details: dict[str, Any]) -> str:
-    """Strip sensitive fields and enforce size limit (M-3)."""
+    """Strip sensitive fields and enforce size limit (M-3).
+
+    Truncation is done by progressively dropping values that exceed the budget
+    rather than slicing the JSON string, which would produce invalid JSON.
+    """
     sanitized = {k: v for k, v in details.items() if k.lower() not in _SENSITIVE_FIELDS}
     encoded = json.dumps(sanitized, default=str)
-    if len(encoded) > _MAX_DETAILS_BYTES:
-        encoded = encoded[:_MAX_DETAILS_BYTES]
-    return encoded
+    if len(encoded) <= _MAX_DETAILS_BYTES:
+        return encoded
+    # Truncate by replacing oversized string values, then fall back to
+    # dropping keys until the serialised form fits within the budget.
+    truncated: dict[str, Any] = {}
+    for k, v in sanitized.items():
+        candidate = json.dumps({**truncated, k: v}, default=str)
+        if len(candidate) <= _MAX_DETAILS_BYTES:
+            truncated[k] = v
+        else:
+            # Try storing a string representation trimmed to a safe length
+            short_v = str(v)[
+                : max(0, _MAX_DETAILS_BYTES - len(json.dumps(truncated, default=str)) - len(k) - 10)
+            ]
+            truncated[k] = short_v + "...[truncated]"
+            break
+    return json.dumps(truncated, default=str)
 
 
 class AuditLogger:
@@ -98,11 +119,17 @@ class AuditLogger:
                 )
         except Exception:
             # Audit must never break the request — log and continue
+            global _audit_failures
+            _audit_failures += 1
             logger.exception(
                 "audit_log_failed",
                 action=action,
                 org_id=org_id,
+                total_failures=_audit_failures,
             )
+
+
+_audit_logger: AuditLogger | None = None
 
 
 async def audit(
@@ -117,10 +144,12 @@ async def audit(
     request_id: str = "",
 ) -> None:
     """Convenience wrapper — logs audit entry to the database."""
-    from breakthevibe.storage.database import get_engine
+    global _audit_logger
+    if _audit_logger is None:
+        from breakthevibe.storage.database import get_engine
 
-    al = AuditLogger(get_engine())
-    await al.log(
+        _audit_logger = AuditLogger(get_engine())
+    await _audit_logger.log(
         org_id=org_id,
         user_id=user_id,
         action=action,

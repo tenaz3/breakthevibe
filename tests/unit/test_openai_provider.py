@@ -252,7 +252,9 @@ class TestOpenAIProviderGenerate:
 
             OpenAIProvider(api_key="sk-secret-key")
 
-        mock_cls.assert_called_once_with(api_key="sk-secret-key")
+        call_kwargs = mock_cls.call_args[1]
+        assert call_kwargs["api_key"] == "sk-secret-key"
+        assert call_kwargs["timeout"] == 120.0
 
 
 @pytest.mark.unit

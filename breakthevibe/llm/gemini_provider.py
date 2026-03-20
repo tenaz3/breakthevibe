@@ -13,7 +13,7 @@ class GeminiProvider(LLMProviderBase):
     """Google Gemini provider via the google-genai SDK."""
 
     def __init__(self, api_key: str, model: str = "gemini-2.5-flash") -> None:
-        self._client = genai.Client(api_key=api_key)
+        self._client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=120000))
         self._model = model
 
     async def generate(
@@ -33,6 +33,9 @@ class GeminiProvider(LLMProviderBase):
                 config=config,
             )
         except Exception as e:
+            # Broad catch: google-genai SDK raises GoogleAPIError for known API failures
+            # but may also propagate httpx.HTTPError, RuntimeError, or other internal
+            # errors that cannot be fully enumerated from the SDK's public API.
             raise LLMProviderError(f"Gemini API error: {e}") from e
 
         usage = response.usage_metadata
@@ -64,6 +67,9 @@ class GeminiProvider(LLMProviderBase):
                 config=config,
             )
         except Exception as e:
+            # Broad catch: google-genai SDK raises GoogleAPIError for known API failures
+            # but may also propagate httpx.HTTPError, RuntimeError, or other internal
+            # errors that cannot be fully enumerated from the SDK's public API.
             raise LLMProviderError(f"Gemini API error: {e}") from e
 
         usage = response.usage_metadata

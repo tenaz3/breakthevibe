@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from openai import AsyncOpenAI
+from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI
 
 from breakthevibe.exceptions import LLMProviderError
 
@@ -17,7 +17,7 @@ class OpenAIProvider(LLMProviderBase):
     """OpenAI GPT provider."""
 
     def __init__(self, api_key: str, model: str = "gpt-4o") -> None:
-        self._client = AsyncOpenAI(api_key=api_key)
+        self._client = AsyncOpenAI(api_key=api_key, timeout=120.0)
         self._model = model
 
     async def generate(
@@ -35,7 +35,7 @@ class OpenAIProvider(LLMProviderBase):
                 messages=messages,
                 max_tokens=max_tokens,
             )
-        except Exception as e:
+        except (APIConnectionError, APIStatusError, APITimeoutError) as e:
             raise LLMProviderError(f"OpenAI API error: {e}") from e
         choice = response.choices[0]
         usage = response.usage

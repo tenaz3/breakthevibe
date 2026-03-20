@@ -3,10 +3,12 @@
 from typing import Any
 
 import structlog
+from playwright.async_api import Error as PlaywrightError
 
 logger = structlog.get_logger(__name__)
 
 API_RESOURCE_TYPES = {"xhr", "fetch"}
+_MAX_RESPONSE_BODY_BYTES = 65536
 
 
 class NetworkInterceptor:
@@ -56,8 +58,16 @@ class NetworkInterceptor:
             call_data["response_headers"] = dict(response.headers)
             try:
                 body = await response.body()
-                call_data["response_body"] = body.decode("utf-8", errors="replace")
-            except Exception:
+                decoded = body.decode("utf-8", errors="replace")
+                if len(body) > _MAX_RESPONSE_BODY_BYTES:
+                    decoded = decoded[:_MAX_RESPONSE_BODY_BYTES] + "[truncated]"
+                call_data["response_body"] = decoded
+            except PlaywrightError as exc:
+                logger.debug(
+                    "response_body_read_failed",
+                    url=response.url,
+                    error=str(exc),
+                )
                 call_data["response_body"] = None
 
     def get_captured_calls(self) -> list[dict[str, Any]]:

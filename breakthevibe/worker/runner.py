@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import signal
+import time
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -30,6 +31,7 @@ class JobWorker:
         self._poll_interval = poll_interval
         self._max_per_tenant = max_per_tenant
         self._running = True
+        self._last_recovery_at: float | None = None
 
     async def run(self) -> None:
         """Main polling loop."""
@@ -43,8 +45,11 @@ class JobWorker:
 
         while self._running:
             try:
-                # Recover stale jobs periodically
-                await self._queue.recover_stale_jobs()
+                # Recover stale jobs at most once every 5 minutes
+                now = time.monotonic()
+                if self._last_recovery_at is None or now - self._last_recovery_at >= 300.0:
+                    await self._queue.recover_stale_jobs()
+                    self._last_recovery_at = now
 
                 job = await self._queue.claim_next(max_per_tenant=self._max_per_tenant)
                 if job:
@@ -54,6 +59,8 @@ class JobWorker:
             except asyncio.CancelledError:
                 break
             except Exception:
+                # Broad catch: poll loop must survive all errors (DB outage, queue
+                # errors, unexpected exceptions) to keep the worker running.
                 logger.exception("worker_poll_error")
                 await asyncio.sleep(self._poll_interval)
 
@@ -81,6 +88,8 @@ class JobWorker:
             await self._queue.complete(job_id)
             await self._audit_job(job, "pipeline.completed")
         except Exception as exc:
+            # Broad catch: job execution can raise any exception from the pipeline;
+            # must always call queue.complete() to prevent job from becoming stale.
             logger.error("job_failed", job_id=job_id, error=str(exc))
             await self._queue.complete(job_id, error=str(exc))
             await self._audit_job(job, "pipeline.failed", error=str(exc))

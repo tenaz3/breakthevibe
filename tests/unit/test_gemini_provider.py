@@ -195,7 +195,9 @@ class TestGeminiProviderGenerate:
 
             GeminiProvider(api_key="my-secret-key")
 
-        mock_genai.Client.assert_called_once_with(api_key="my-secret-key")
+        call_kwargs = mock_genai.Client.call_args[1]
+        assert call_kwargs["api_key"] == "my-secret-key"
+        assert call_kwargs["http_options"].timeout == 120000
 
     @pytest.mark.asyncio
     async def test_generate_api_error_raises_llm_provider_error(self) -> None:

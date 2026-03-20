@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from anthropic import AsyncAnthropic
+from anthropic import APIConnectionError, APIStatusError, APITimeoutError, AsyncAnthropic
 
 from breakthevibe.exceptions import LLMProviderError
 from breakthevibe.llm.provider import LLMProviderBase, LLMResponse
@@ -10,7 +10,7 @@ from breakthevibe.llm.provider import LLMProviderBase, LLMResponse
 
 class AnthropicProvider(LLMProviderBase):
     def __init__(self, api_key: str, model: str = "claude-sonnet-4-20250514"):
-        self._client = AsyncAnthropic(api_key=api_key)
+        self._client = AsyncAnthropic(api_key=api_key, timeout=120.0)
         self._model = model
 
     async def generate(
@@ -26,7 +26,7 @@ class AnthropicProvider(LLMProviderBase):
 
         try:
             message = await self._client.messages.create(**kwargs)
-        except Exception as e:
+        except (APIConnectionError, APIStatusError, APITimeoutError) as e:
             raise LLMProviderError(f"Anthropic API error: {e}") from e
         return LLMResponse(
             content=message.content[0].text,

@@ -200,10 +200,9 @@ class JobQueue:
         async with self._engine.begin() as conn:
             result = await conn.execute(
                 text(
-                    "UPDATE pipeline_jobs SET status = 'pending', "
-                    "started_at = NULL "
+                    "UPDATE pipeline_jobs SET status = 'pending' "
                     "WHERE status = 'running' "
-                    "AND started_at < NOW() - INTERVAL ':minutes minutes'"
+                    "AND started_at < NOW() - :minutes * INTERVAL '1 minute'"
                 ).bindparams(minutes=_STALE_JOB_TIMEOUT_MINUTES),
             )
             count = result.rowcount or 0

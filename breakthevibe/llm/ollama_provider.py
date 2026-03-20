@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
+from httpx import ConnectError, HTTPError, TimeoutException
 
 from breakthevibe.exceptions import LLMProviderError
 from breakthevibe.llm.provider import LLMProviderBase, LLMResponse
@@ -35,7 +36,7 @@ class OllamaProvider(LLMProviderBase):
                 resp = await client.post(f"{self._base_url}/api/generate", json=payload)
                 resp.raise_for_status()
                 data = resp.json()
-        except Exception as e:
+        except (HTTPError, ConnectError, TimeoutException) as e:
             raise LLMProviderError(f"Ollama API error: {e}") from e
 
         return LLMResponse(
