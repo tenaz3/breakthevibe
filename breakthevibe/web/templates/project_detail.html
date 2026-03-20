@@ -28,24 +28,27 @@
                 hx-swap="none"
                 hx-disabled-elt="this"
                 hx-on::after-request="onPipelineTrigger(event, 'Crawl started')">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
-            Crawl
+            <svg class="btn-spinner hidden w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            <svg class="btn-icon w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+            <span class="btn-label">Crawl</span>
         </button>
         <button class="btn btn-primary" id="btn-generate"
                 hx-post="/api/projects/{{ project.id }}/generate"
                 hx-swap="none"
                 hx-disabled-elt="this"
                 hx-on::after-request="onPipelineTrigger(event, 'Test generation started')">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-            Generate
+            <svg class="btn-spinner hidden w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            <svg class="btn-icon w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            <span class="btn-label">Generate</span>
         </button>
         <button class="btn btn-primary" id="btn-run"
                 hx-post="/api/projects/{{ project.id }}/run"
                 hx-swap="none"
                 hx-disabled-elt="this"
                 hx-on::after-request="onPipelineTrigger(event, 'Test run started')">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>
-            Run Tests
+            <svg class="btn-spinner hidden w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            <svg class="btn-icon w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>
+            <span class="btn-label">Run Tests</span>
         </button>
 
         <div class="separator-vertical"></div>
@@ -65,7 +68,7 @@
     </div>
 
     <!-- Progress card (hidden until pipeline starts) -->
-    <div id="pipeline-progress" class="pipeline-progress-card hidden">
+    <div id="pipeline-progress" class="pipeline-progress-card hidden" aria-busy="false">
         <div class="flex items-center gap-3 mb-3">
             <svg class="w-4 h-4 animate-spin text-primary" id="progress-spinner" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
@@ -100,10 +103,7 @@
 <!-- Tab: Site Map -->
 <div id="tab-sitemap" class="tab-panel hidden" role="tabpanel">
     <div class="flex items-center justify-center py-16">
-        <div class="flex items-center gap-2 text-muted-foreground text-[0.8125rem]">
-            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-            Loading...
-        </div>
+        <p class="text-muted-foreground text-[0.8125rem]">Click the Site Map tab to load.</p>
     </div>
 </div>
 {% endblock %}
@@ -152,17 +152,46 @@
         });
     }
 
+    var BTN_LABELS = { 'btn-crawl': 'Crawl', 'btn-generate': 'Generate', 'btn-run': 'Run Tests' };
+    var BTN_LOADING = { 'btn-crawl': 'Crawling...', 'btn-generate': 'Generating...', 'btn-run': 'Running...' };
+
+    function setPipelineButtonsLoading(loading) {
+        ['btn-crawl', 'btn-generate', 'btn-run'].forEach(function(id) {
+            var btn = document.getElementById(id);
+            if (!btn) return;
+            var spinner = btn.querySelector('.btn-spinner');
+            var icon = btn.querySelector('.btn-icon');
+            var label = btn.querySelector('.btn-label');
+            if (loading) {
+                btn.disabled = true;
+                if (spinner) spinner.classList.remove('hidden');
+                if (icon) icon.classList.add('hidden');
+                if (label) label.textContent = BTN_LOADING[id];
+            } else {
+                btn.disabled = false;
+                if (spinner) spinner.classList.add('hidden');
+                if (icon) icon.classList.remove('hidden');
+                if (label) label.textContent = BTN_LABELS[id];
+            }
+        });
+    }
+
     function showProgressCard() {
+        setPipelineButtonsLoading(true);
         document.getElementById('action-buttons').classList.add('hidden');
         var card = document.getElementById('pipeline-progress');
         card.classList.remove('hidden');
+        card.setAttribute('aria-busy', 'true');
         document.getElementById('progress-label').textContent = 'Pipeline running...';
         document.getElementById('progress-spinner').classList.remove('hidden');
     }
 
     function hideProgressCard() {
-        document.getElementById('pipeline-progress').classList.add('hidden');
+        var card = document.getElementById('pipeline-progress');
+        card.classList.add('hidden');
+        card.setAttribute('aria-busy', 'false');
         document.getElementById('action-buttons').classList.remove('hidden');
+        setPipelineButtonsLoading(false);
     }
 
     /* ── EventSource lifecycle ──────────────────────────────── */
@@ -507,6 +536,25 @@
                 clearAndAppend('tab-sitemap', errBox);
             });
     }
+
+    /* ── Tab keyboard navigation ─────────────────────────────── */
+    document.querySelectorAll('[role="tablist"]').forEach(function(tablist) {
+        tablist.addEventListener('keydown', function(e) {
+            var tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+            var current = tabs.findIndex(function(t) { return t.getAttribute('aria-selected') === 'true'; });
+            var next = -1;
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                next = (current + 1) % tabs.length;
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                next = (current - 1 + tabs.length) % tabs.length;
+            }
+            if (next >= 0) {
+                e.preventDefault();
+                tabs[next].click();
+                tabs[next].focus();
+            }
+        });
+    });
 
     /* ── Lazy-load sitemap ───────────────────────────────────── */
     document.querySelector('[data-tab="sitemap"]').addEventListener('click', loadSitemap);
