@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
+import shutil
 import sys
 import time
 from dataclasses import dataclass, field
@@ -71,6 +73,7 @@ class TestExecutor:
         )
 
         start = time.monotonic()
+        exec_result: ExecutionResult
         try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -86,7 +89,7 @@ class TestExecutor:
             # Load captured step data if available
             captures = self._load_captures(suite_name)
 
-            return ExecutionResult(
+            exec_result = ExecutionResult(
                 suite_name=suite_name,
                 success=proc.returncode == 0,
                 exit_code=proc.returncode or 0,
@@ -105,7 +108,7 @@ class TestExecutor:
             )
             proc.kill()
             await proc.wait()
-            return ExecutionResult(
+            exec_result = ExecutionResult(
                 suite_name=suite_name,
                 success=False,
                 exit_code=-1,
@@ -115,6 +118,9 @@ class TestExecutor:
                 test_file=test_file,
                 duration_seconds=duration,
             )
+        finally:
+            self._cleanup_test_files(suite_name, test_file)
+        return exec_result
 
     def _write_test_file(self, suite_name: str, test_code: str) -> Path:
         """Write test code to a temporary file."""
@@ -190,8 +196,11 @@ def _capture_step_data(request):
         import asyncio
         try:
             ss_path = CAPTURES_DIR / f"{{request.node.name}}.png"
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(page.screenshot(path=str(ss_path)))
+            loop = asyncio.new_event_loop()
+            try:
+                loop.run_until_complete(page.screenshot(path=str(ss_path)))
+            finally:
+                loop.close()
             screenshot_path = str(ss_path)
         except Exception:
             pass
@@ -228,6 +237,20 @@ def _capture_step_data(request):
             except (json.JSONDecodeError, OSError):
                 continue
         return captures
+
+    def _cleanup_test_files(self, suite_name: str, test_file: Path | None) -> None:
+        """Remove generated test file and captures directory to prevent disk fill (#6)."""
+        if test_file is not None:
+            with contextlib.suppress(OSError):
+                test_file.unlink(missing_ok=True)
+        captures_dir = self._output_dir / f"{suite_name}_captures"
+        with contextlib.suppress(OSError):
+            shutil.rmtree(captures_dir, ignore_errors=True)
+        # Remove conftest written for this suite run
+        conftest = self._output_dir / "conftest.py"
+        with contextlib.suppress(OSError):
+            conftest.unlink(missing_ok=True)
+        logger.debug("test_files_cleaned_up", suite=suite_name)
 
     def _build_command(self, test_file: Path, workers: int) -> list[str]:
         """Build the pytest command with retry and parallel support."""

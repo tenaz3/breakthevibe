@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from typing import TYPE_CHECKING
+from collections import deque
+from typing import TYPE_CHECKING, Any
 
 import structlog
+from playwright.async_api import Error as PlaywrightError
 
 from breakthevibe.constants import (
     DEFAULT_AFTER_CLICK_WAIT_MS,
@@ -94,9 +96,18 @@ class Crawler:
         interceptor = NetworkInterceptor()
 
         pages: list[PageData] = []
-        queue: list[tuple[str, int]] = [(url, 0)]
+        queue: deque[tuple[str, int]] = deque([(url, 0)])
 
         await self._browser.launch()
+        _response_tasks: set[asyncio.Task[None]] = set()
+
+        def _schedule_response(r: Any) -> None:
+            task: asyncio.Task[None] = asyncio.get_running_loop().create_task(
+                interceptor.on_response(r)
+            )
+            _response_tasks.add(task)
+            task.add_done_callback(_response_tasks.discard)
+
         try:
             video_dir = None
             if self._artifacts and self._project_id and self._run_id:
@@ -105,7 +116,7 @@ class Crawler:
                 video_dir = str(videos_dir)
 
             while queue:
-                current_url, depth = queue.pop(0)
+                current_url, depth = queue.popleft()
                 if not navigator.should_visit(current_url):
                     continue
                 if not navigator.is_within_depth(depth):
@@ -121,17 +132,24 @@ class Crawler:
                 )
                 page = await self._browser.new_page(context)
 
-                # Install network interception
+                # Install network interception with tracked tasks
                 page.on("request", interceptor.on_request)
-                page.on("response", lambda r: asyncio.ensure_future(interceptor.on_response(r)))
+                page.on("response", _schedule_response)
 
-                page_data = await self._crawl_page(
-                    page, current_url, navigator, extractor, interceptor, depth
-                )
+                try:
+                    page_data = await self._crawl_page(
+                        page, current_url, navigator, extractor, interceptor, depth
+                    )
+                finally:
+                    # Drain in-flight response tasks before closing context
+                    if _response_tasks:
+                        await asyncio.gather(*list(_response_tasks), return_exceptions=True)
+                        _response_tasks.clear()
 
-                # Close context to finalize per-route video
-                video_obj = page.video
-                await context.close()
+                    # Always close context to prevent browser context leak on exceptions (#5)
+                    video_obj = page.video
+                    with contextlib.suppress(Exception):
+                        await context.close()
 
                 # Assign video path from Playwright (#7)
                 if video_obj:
@@ -151,6 +169,11 @@ class Crawler:
                 # (SPA routes were already enqueued in _crawl_page's link discovery)
 
         finally:
+            # Cancel any remaining untracked response tasks on abnormal exit
+            for task in list(_response_tasks):
+                task.cancel()
+            if _response_tasks:
+                await asyncio.gather(*list(_response_tasks), return_exceptions=True)
             await self._browser.close()
 
         total_components = sum(len(p.components) for p in pages)
@@ -261,7 +284,7 @@ class Crawler:
                 json_dir.mkdir(exist_ok=True)
                 json_file = json_dir / f"{route_name}.json"
                 json_file.write_text(page_data.model_dump_json(indent=2))
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 logger.debug("route_json_write_failed", error=str(e))
 
         return page_data
@@ -287,7 +310,7 @@ class Crawler:
                         await page.wait_for_timeout(self._after_click_wait)
                         logger.debug("cookie_banner_dismissed", selector=selector)
                         break
-                except Exception:  # nosec B112
+                except PlaywrightError:  # nosec B112
                     continue
 
         # Close modals
@@ -304,7 +327,7 @@ class Crawler:
                         await page.wait_for_timeout(self._after_click_wait)
                         logger.debug("modal_closed", selector=selector)
                         break
-                except Exception:  # nosec B112
+                except PlaywrightError:  # nosec B112
                     continue
 
     async def _click_interactive_elements(
@@ -347,8 +370,14 @@ class Crawler:
                                     f"before_click_{click_index}",
                                     ss_data,
                                 )
-                            except Exception:  # nosec B110
-                                pass
+                            except (PlaywrightError, OSError) as exc:
+                                logger.warning(
+                                    "screenshot_failed",
+                                    phase="before_click",
+                                    click_index=click_index,
+                                    url=page.url,
+                                    error=str(exc),
+                                )
 
                         await link.click(timeout=2000)
                         await page.wait_for_timeout(self._after_click_wait)
@@ -363,16 +392,22 @@ class Crawler:
                                     f"after_click_{click_index}",
                                     ss_data,
                                 )
-                            except Exception:  # nosec B110
-                                pass
+                            except (PlaywrightError, OSError) as exc:
+                                logger.warning(
+                                    "screenshot_failed",
+                                    phase="after_click",
+                                    click_index=click_index,
+                                    url=page.url,
+                                    error=str(exc),
+                                )
 
                         click_index += 1
                         # Navigate back for the next click
                         await page.go_back(timeout=self._page_load_timeout)
                         await page.wait_for_timeout(self._after_click_wait)
-                    except Exception:  # nosec B112
+                    except PlaywrightError:  # nosec B112
                         continue
-            except Exception:  # nosec B112
+            except PlaywrightError:  # nosec B112
                 continue
 
     async def _scroll_for_content(self, page: Page) -> None:

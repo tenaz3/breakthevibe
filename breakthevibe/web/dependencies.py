@@ -56,9 +56,7 @@ def _lock_key(org_id: str, project_id: str) -> str:
 def _get_pipeline_lock(org_id: str, project_id: str) -> asyncio.Lock:
     """Get or create an asyncio.Lock for a specific org+project."""
     key = _lock_key(org_id, project_id)
-    if key not in _pipeline_locks:
-        _pipeline_locks[key] = asyncio.Lock()
-    return _pipeline_locks[key]
+    return _pipeline_locks.setdefault(key, asyncio.Lock())
 
 
 async def run_pipeline(
@@ -66,129 +64,150 @@ async def run_pipeline(
     url: str,
     rules_yaml: str = "",
     org_id: str = SENTINEL_ORG_ID,
+    request_id: str | None = None,
 ) -> None:
     """Run the full pipeline as a background task."""
+    import structlog.contextvars
+
     from breakthevibe.web.pipeline import build_pipeline
     from breakthevibe.web.sse import PipelineProgressEvent, progress_bus
+
+    if request_id:
+        structlog.contextvars.bind_contextvars(request_id=request_id)
+
+    # Validate and parse project_id once; all int-typed downstream calls use pid.
+    try:
+        pid = int(project_id)
+    except (ValueError, TypeError):
+        logger.error("invalid_project_id", project_id=project_id)
+        return
 
     lock = _get_pipeline_lock(org_id, project_id)
     if lock.locked():
         logger.warning("pipeline_already_running", project_id=project_id, org_id=org_id)
         return
 
-    async with lock:
-        logger.info(
-            "pipeline_background_start",
-            project_id=project_id,
-            org_id=org_id,
-            url=url,
-        )
-
-        # Clear stale progress state from any previous run
-        progress_bus.clear(project_id)
-
-        def _progress(stage: str, status: str, error: str = "") -> None:
-            progress_bus.notify(
-                PipelineProgressEvent(
-                    project_id=project_id,
-                    stage=stage,
-                    status=status,
-                    error=error,
-                )
-            )
-
-        try:
-            orchestrator = await build_pipeline(
-                project_id=project_id,
-                url=url,
-                rules_yaml=rules_yaml,
-                progress_callback=_progress,
-                org_id=org_id,
-            )
-            result = await orchestrator.run(
-                project_id=project_id,
-                url=url,
-                rules_yaml=rules_yaml,
-            )
-
-            # Build rich result data including report details
-            report = result.report
-            result_data: dict[str, Any] = {
-                "run_id": result.run_id,
-                "success": result.success,
-                "completed_stages": [s.value for s in result.completed_stages],
-                "failed_stage": (result.failed_stage.value if result.failed_stage else None),
-                "error_message": result.error_message,
-                "duration_seconds": result.duration_seconds,
-            }
-            if report:
-                result_data["total"] = report.total_suites
-                result_data["passed"] = report.passed_suites
-                result_data["failed"] = report.failed_suites
-                result_data["status"] = report.overall_status.value
-                result_data["heal_warnings"] = report.heal_warnings
-                result_data["suites"] = [
-                    {
-                        "name": r.suite_name,
-                        "success": r.success,
-                        "stdout": r.stdout,
-                        "duration": r.duration_seconds,
-                        "step_captures": [
-                            {
-                                "name": sc.name,
-                                "screenshot_path": sc.screenshot_path,
-                                "network_calls": sc.network_calls,
-                                "console_logs": sc.console_logs,
-                            }
-                            for sc in r.step_captures
-                        ],
-                    }
-                    for r in report.results
-                ]
-
-            # Persist to DB
-            try:
-                await test_run_repo.save_pipeline_result(
-                    project_id=int(project_id),
-                    org_id=org_id,
-                    result_data=result_data,
-                )
-            except (ValueError, TypeError, OSError) as persist_err:
-                logger.warning("test_run_persist_failed", error=str(persist_err))
-
-            status = "completed" if result.success else "failed"
-            await project_repo.update(
-                project_id, org_id=org_id, status=status, last_run_id=result.run_id
-            )
+    try:
+        async with lock:
             logger.info(
-                "pipeline_background_done",
+                "pipeline_background_start",
                 project_id=project_id,
                 org_id=org_id,
-                success=result.success,
+                url=url,
             )
 
-        except Exception as e:
-            logger.error(
-                "pipeline_background_error",
-                project_id=project_id,
-                org_id=org_id,
-                error=str(e),
-            )
-            progress_bus.notify(
-                PipelineProgressEvent(
+            # Clear stale progress state from any previous run
+            progress_bus.clear(project_id)
+
+            def _progress(stage: str, status: str, error: str = "") -> None:
+                progress_bus.notify(
+                    PipelineProgressEvent(
+                        project_id=project_id,
+                        stage=stage,
+                        status=status,
+                        error=error,
+                    )
+                )
+
+            try:
+                orchestrator = await build_pipeline(
                     project_id=project_id,
-                    stage="",
-                    status="failed",
+                    url=url,
+                    rules_yaml=rules_yaml,
+                    progress_callback=_progress,
+                    org_id=org_id,
+                )
+                result = await orchestrator.run(
+                    project_id=project_id,
+                    url=url,
+                    rules_yaml=rules_yaml,
+                    org_id=org_id,
+                )
+
+                # Build rich result data including report details
+                report = result.report
+                result_data: dict[str, Any] = {
+                    "run_id": result.run_id,
+                    "success": result.success,
+                    "completed_stages": [s.value for s in result.completed_stages],
+                    "failed_stage": (result.failed_stage.value if result.failed_stage else None),
+                    "error_message": result.error_message,
+                    "duration_seconds": result.duration_seconds,
+                }
+                if report:
+                    result_data["total"] = report.total_suites
+                    result_data["passed"] = report.passed_suites
+                    result_data["failed"] = report.failed_suites
+                    result_data["status"] = report.overall_status.value
+                    result_data["heal_warnings"] = report.heal_warnings
+                    result_data["suites"] = [
+                        {
+                            "name": r.suite_name,
+                            "success": r.success,
+                            "stdout": r.stdout,
+                            "duration": r.duration_seconds,
+                            "step_captures": [
+                                {
+                                    "name": sc.name,
+                                    "screenshot_path": sc.screenshot_path,
+                                    "network_calls": sc.network_calls,
+                                    "console_logs": sc.console_logs,
+                                }
+                                for sc in r.step_captures
+                            ],
+                        }
+                        for r in report.results
+                    ]
+
+                # Persist to DB
+                try:
+                    await test_run_repo.save_pipeline_result(
+                        project_id=pid,
+                        org_id=org_id,
+                        result_data=result_data,
+                    )
+                except (ValueError, TypeError, OSError) as persist_err:
+                    logger.warning("test_run_persist_failed", error=str(persist_err))
+
+                status = "completed" if result.success else "failed"
+                await project_repo.update(
+                    project_id, org_id=org_id, status=status, last_run_id=result.run_id
+                )
+                logger.info(
+                    "pipeline_background_done",
+                    project_id=project_id,
+                    org_id=org_id,
+                    success=result.success,
+                )
+
+            except Exception as e:
+                # Broad catch: top-level background task must catch all exceptions to
+                # ensure the progress bus is always notified on failure regardless of cause.
+                logger.error(
+                    "pipeline_background_error",
+                    project_id=project_id,
+                    org_id=org_id,
                     error=str(e),
                 )
-            )
-            await project_repo.update(project_id, org_id=org_id, status="failed")
-            # Persist the failure to DB
-            try:
-                await test_run_repo.save_pipeline_result(
-                    project_id=int(project_id),
-                    org_id=org_id,
-                    result_data={"success": False, "error_message": str(e)},
+                progress_bus.notify(
+                    PipelineProgressEvent(
+                        project_id=project_id,
+                        stage="",
+                        status="failed",
+                        error=str(e),
+                    )
                 )
-            except (ValueError, TypeError, OSError) as persist_err:
-                logger.warning("test_run_persist_failed", error=str(persist_err))
+                await project_repo.update(project_id, org_id=org_id, status="failed")
+                # Persist the failure to DB
+                try:
+                    await test_run_repo.save_pipeline_result(
+                        project_id=pid,
+                        org_id=org_id,
+                        result_data={"success": False, "error_message": str(e)},
+                    )
+                except (ValueError, TypeError, OSError) as persist_err:
+                    logger.warning("test_run_persist_failed", error=str(persist_err))
+    finally:
+        # Clean up the lock entry once the pipeline is done so _pipeline_locks
+        # doesn't grow unbounded over the lifetime of the process (#4).
+        _pipeline_locks.pop(_lock_key(org_id, project_id), None)

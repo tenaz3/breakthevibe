@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
 
 from breakthevibe.config.settings import SENTINEL_ORG_ID
-from breakthevibe.models.database import CrawlRun, Project, TestCase, TestResult, TestRun
+from breakthevibe.models.database import CrawlRun, Project, TestCase, TestResult, TestRun, _utc_now
 
 logger = structlog.get_logger(__name__)
 
@@ -37,7 +37,7 @@ class DatabaseProjectRepository:
             "rules_yaml": project.config_yaml or "",
             "created_at": project.created_at.isoformat(),
             "last_run_at": None,
-            "status": "created",
+            "status": project.status,
         }
 
     async def create(
@@ -84,7 +84,7 @@ class DatabaseProjectRepository:
             pid = int(project_id)
         except (ValueError, TypeError):
             return False
-        async with AsyncSession(self._engine) as session:
+        async with AsyncSession(self._engine) as session, session.begin():
             statement = select(Project).where(col(Project.id) == pid, col(Project.org_id) == org_id)
             result = await session.execute(statement)
             project = result.scalars().first()
@@ -115,9 +115,9 @@ class DatabaseProjectRepository:
                 await session.execute(delete(CrawlRun).where(col(CrawlRun.project_id) == pid))
 
             await session.delete(project)
-            await session.commit()
-            logger.info("project_deleted", id=project_id, org_id=org_id)
-            return True
+
+        logger.info("project_deleted", id=project_id, org_id=org_id)
+        return True
 
     async def update(
         self, project_id: str, org_id: str = SENTINEL_ORG_ID, **updates: Any
@@ -138,12 +138,15 @@ class DatabaseProjectRepository:
                 project.url = updates["url"]
             if "rules_yaml" in updates:
                 project.config_yaml = updates["rules_yaml"]
+            if "status" in updates:
+                project.status = updates["status"]
+            project.updated_at = _utc_now()
             session.add(project)
             await session.commit()
             await session.refresh(project)
             out = self._to_dict(project)
             # Merge extra non-DB fields into the result dict
-            for key in ("status", "last_run_id", "last_run_at"):
+            for key in ("last_run_id", "last_run_at"):
                 if key in updates:
                     out[key] = updates[key]
             return out

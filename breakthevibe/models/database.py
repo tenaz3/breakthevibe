@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from breakthevibe.config.settings import SENTINEL_ORG_ID
@@ -70,6 +71,7 @@ class Project(SQLModel, table=True):
     name: str = Field(index=True)
     url: str
     config_yaml: str | None = None
+    status: str = Field(default="created")  # created | running | completed | failed
     created_at: datetime = Field(default_factory=_utc_now)
     updated_at: datetime = Field(default_factory=_utc_now)
 
@@ -184,6 +186,7 @@ class Subscription(SQLModel, table=True):
 
 class UsageRecord(SQLModel, table=True):
     __tablename__ = "usage_records"
+    __table_args__ = (UniqueConstraint("org_id", "metric", "period"),)
 
     id: int | None = Field(default=None, primary_key=True)
     org_id: str = Field(index=True)
@@ -259,9 +262,10 @@ class WebAuthnCredential(SQLModel, table=True):
 
 class LlmSetting(SQLModel, table=True):
     __tablename__ = "llm_settings"
+    __table_args__ = (UniqueConstraint("org_id", "key"),)
 
     id: int | None = Field(default=None, primary_key=True)
     org_id: str = Field(default=SENTINEL_ORG_ID, index=True)
-    key: str = Field(index=True, unique=True)
+    key: str = Field(index=True)
     value_json: str
     updated_at: datetime = Field(default_factory=_utc_now)
