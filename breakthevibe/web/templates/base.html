@@ -63,7 +63,8 @@
     <script src="https://unpkg.com/htmx-ext-json-enc@2.0.1/json-enc.js"></script>
     {% block head %}{% endblock %}
 </head>
-<body class="bg-background text-foreground min-h-screen antialiased font-sans">
+<body class="bg-background text-foreground min-h-screen antialiased font-sans flex flex-col">
+    {% block nav %}
     <!-- Navigation -->
     <nav class="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
         <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -71,10 +72,11 @@
                 BreakTheVibe
             </a>
             <div class="flex items-center gap-1">
-                <a href="/" class="px-3 py-1.5 text-[0.8125rem] text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-all">
+                {% set current_path = request.url.path if request else '' %}
+                <a href="/" class="px-3 py-1.5 text-[0.8125rem] {% if current_path == '/' or current_path.startswith('/projects') %}text-foreground font-medium{% else %}text-muted-foreground{% endif %} hover:text-foreground hover:bg-accent rounded-md transition-all">
                     Projects
                 </a>
-                <a href="/settings/llm" class="px-3 py-1.5 text-[0.8125rem] text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-all">
+                <a href="/settings/llm" class="px-3 py-1.5 text-[0.8125rem] {% if current_path.startswith('/settings') %}text-foreground font-medium{% else %}text-muted-foreground{% endif %} hover:text-foreground hover:bg-accent rounded-md transition-all">
                     Settings
                 </a>
                 <div class="w-px h-4 bg-border mx-1"></div>
@@ -92,28 +94,28 @@
             </div>
         </div>
     </nav>
+    {% endblock nav %}
 
+    {% block body_content %}
     <main class="max-w-6xl mx-auto px-6 py-8 animate-fade-in">
         {% block content %}{% endblock %}
     </main>
+    {% endblock body_content %}
 
     <!-- Toast container -->
-    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none" role="status" aria-live="polite"></div>
 
     <!-- Confirmation dialog -->
-    <div id="confirm-dialog" class="hidden">
-        <div class="dialog-overlay" onclick="closeConfirmDialog()"></div>
-        <div class="dialog">
-            <div class="dialog-content">
-                <h3 id="confirm-title" class="dialog-title">Are you sure?</h3>
-                <p id="confirm-message" class="dialog-description"></p>
-                <div class="dialog-actions">
-                    <button onclick="closeConfirmDialog()" class="btn btn-secondary">Cancel</button>
-                    <button id="confirm-action" class="btn btn-destructive">Delete</button>
-                </div>
+    <dialog id="confirm-dialog" class="dialog">
+        <div class="dialog-content">
+            <h3 id="confirm-title" class="dialog-title">Are you sure?</h3>
+            <p id="confirm-message" class="dialog-description"></p>
+            <div class="dialog-actions">
+                <button onclick="closeConfirmDialog()" class="btn btn-secondary">Cancel</button>
+                <button id="confirm-action" class="btn btn-destructive">Delete</button>
             </div>
         </div>
-    </div>
+    </dialog>
 
     <script>
     /* ── Theme Toggle ────────────────────────────────────────── */
@@ -131,6 +133,7 @@
         var cls = {
             error: 'toast toast-error',
             success: 'toast toast-success',
+            warning: 'toast toast-warning',
             info: 'toast toast-info',
         };
         toast.className = (cls[type] || cls.info) + ' translate-y-2 opacity-0';
@@ -140,10 +143,8 @@
         toast.appendChild(span);
 
         var close = document.createElement('button');
-        close.className = 'ml-auto opacity-50 hover:opacity-100 transition-opacity cursor-pointer';
-        close.textContent = '\u00d7';
-        close.style.fontSize = '1rem';
-        close.style.lineHeight = '1';
+        close.className = 'ml-auto opacity-50 hover:opacity-100 transition-opacity cursor-pointer flex items-center';
+        close.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>';
         close.addEventListener('click', function() { dismissToast(toast); });
         toast.appendChild(close);
 
@@ -167,11 +168,11 @@
         document.getElementById('confirm-message').textContent = message;
         document.getElementById('confirm-action').textContent = actionLabel;
         confirmCallback = callback;
-        document.getElementById('confirm-dialog').classList.remove('hidden');
+        document.getElementById('confirm-dialog').showModal();
     }
 
     function closeConfirmDialog() {
-        document.getElementById('confirm-dialog').classList.add('hidden');
+        document.getElementById('confirm-dialog').close();
         confirmCallback = null;
     }
 

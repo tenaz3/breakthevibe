@@ -420,14 +420,15 @@ code, pre, .font-mono { font-family: var(--font-mono); }
 /* ─── Select ────────────────────────────────────────────────── */
 .select {
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236e7191' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236e7191' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath stroke-linecap='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.75rem center;
-    padding-right: 2.25rem;
+    background-size: 1rem;
+    padding-right: 2.5rem;
 }
 
 .dark .select {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a0a0ae' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23a0a0ae' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath stroke-linecap='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 /* ─── Tabs ──────────────────────────────────────────────────── */
@@ -713,22 +714,17 @@ details.accordion .accordion-content {
 .back-link svg { width: 0.875rem; height: 0.875rem; }
 
 /* ─── Dialog ────────────────────────────────────────────────── */
-.dialog-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--dialog-overlay);
-    backdrop-filter: blur(4px);
-    z-index: 50;
+.dialog {
+    border: none;
+    background: transparent;
+    padding: 1rem;
+    max-width: none;
+    max-height: none;
 }
 
-.dialog {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-    z-index: 51;
+.dialog::backdrop {
+    background: var(--dialog-overlay);
+    backdrop-filter: blur(4px);
 }
 
 .dialog-content {
@@ -1048,6 +1044,15 @@ fieldset.field-group legend {
     font-size: 0.8125rem;
     color: var(--muted-foreground);
     user-select: none;
+}
+
+/* ─── Reduced Motion ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 /* ─── Responsive ────────────────────────────────────────────── */
