@@ -1,0 +1,58 @@
+{# Reusable pagination component
+   Expects: page (int), total_pages (int), total (int), base_url (str)
+   base_url should be the path without ?page= (e.g. "/" or "/projects/5/runs")
+#}
+{% if total_pages > 1 %}
+<nav class="pagination" aria-label="Pagination">
+    <span class="pagination-info">
+        {{ total }} result{{ 's' if total != 1 else '' }}
+    </span>
+    <div class="pagination-controls">
+        {% if page > 1 %}
+        <a href="{{ base_url }}?page={{ page - 1 }}" class="pagination-btn" aria-label="Previous page">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        {% else %}
+        <span class="pagination-btn pagination-btn-disabled" aria-disabled="true">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </span>
+        {% endif %}
+
+        {% set window = 2 %}
+        {% set start = [1, page - window] | max %}
+        {% set end = [total_pages, page + window] | min %}
+
+        {% if start > 1 %}
+        <a href="{{ base_url }}?page=1" class="pagination-btn">1</a>
+        {% if start > 2 %}
+        <span class="pagination-ellipsis">&hellip;</span>
+        {% endif %}
+        {% endif %}
+
+        {% for p in range(start, end + 1) %}
+        {% if p == page %}
+        <span class="pagination-btn pagination-btn-active" aria-current="page">{{ p }}</span>
+        {% else %}
+        <a href="{{ base_url }}?page={{ p }}" class="pagination-btn">{{ p }}</a>
+        {% endif %}
+        {% endfor %}
+
+        {% if end < total_pages %}
+        {% if end < total_pages - 1 %}
+        <span class="pagination-ellipsis">&hellip;</span>
+        {% endif %}
+        <a href="{{ base_url }}?page={{ total_pages }}" class="pagination-btn">{{ total_pages }}</a>
+        {% endif %}
+
+        {% if page < total_pages %}
+        <a href="{{ base_url }}?page={{ page + 1 }}" class="pagination-btn" aria-label="Next page">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </a>
+        {% else %}
+        <span class="pagination-btn pagination-btn-disabled" aria-disabled="true">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </span>
+        {% endif %}
+    </div>
+</nav>
+{% endif %}

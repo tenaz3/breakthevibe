@@ -72,9 +72,11 @@ async def create_project(
 
 @router.get("", response_model=list[ProjectResponse])
 async def list_projects(
+    limit: int = 50,
+    offset: int = 0,
     tenant: TenantContext = Depends(get_tenant),
 ) -> list[dict[str, Any]]:
-    return await project_repo.list_all(org_id=tenant.org_id)
+    return await project_repo.list_all(org_id=tenant.org_id, limit=min(limit, 100), offset=offset)
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)

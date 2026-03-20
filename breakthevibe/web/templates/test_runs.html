@@ -6,7 +6,7 @@
     {{ project.name }}
 </a>
 
-<div class="page-header mb-6">
+<div class="page-header">
     <h1>Test Runs</h1>
 </div>
 
@@ -41,6 +41,7 @@
     </a>
     {% endfor %}
 </div>
+{% include "partials/pagination.html" with context %}
 {% else %}
 <div class="card">
     <div class="empty-state">

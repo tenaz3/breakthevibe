@@ -56,15 +56,32 @@ class DatabaseProjectRepository:
             logger.info("project_created", id=result["id"], name=name, org_id=org_id)
             return result
 
-    async def list_all(self, org_id: str = SENTINEL_ORG_ID) -> list[dict[str, Any]]:
+    async def list_all(
+        self,
+        org_id: str = SENTINEL_ORG_ID,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
         async with AsyncSession(self._engine) as session:
             statement = (
                 select(Project)
                 .where(col(Project.org_id) == org_id)
                 .order_by(Project.created_at.desc())  # type: ignore[attr-defined]
+                .limit(limit)
+                .offset(offset)
             )
             results = await session.execute(statement)
             return [self._to_dict(p) for p in results.scalars().all()]
+
+    async def count(self, org_id: str = SENTINEL_ORG_ID) -> int:
+        async with AsyncSession(self._engine) as session:
+            from sqlalchemy import func
+
+            statement = (
+                select(func.count()).select_from(Project).where(col(Project.org_id) == org_id)
+            )
+            result = await session.execute(statement)
+            return result.scalar_one()
 
     async def get(self, project_id: str, org_id: str = SENTINEL_ORG_ID) -> dict[str, Any] | None:
         try:

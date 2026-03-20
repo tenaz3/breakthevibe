@@ -139,8 +139,10 @@ class TestRunRepository:
         self,
         project_id: int,
         org_id: str = SENTINEL_ORG_ID,
+        limit: int = 50,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
-        """Return all test runs for a project, newest first."""
+        """Return test runs for a project, newest first."""
         async with AsyncSession(self._engine) as session:
             stmt = (
                 select(TestRun)
@@ -149,6 +151,28 @@ class TestRunRepository:
                     col(TestRun.org_id) == org_id,
                 )
                 .order_by(TestRun.created_at.desc())  # type: ignore[attr-defined]
+                .limit(limit)
+                .offset(offset)
             )
             result = await session.execute(stmt)
             return [self._to_dict(r) for r in result.scalars().all()]
+
+    async def count_for_project(
+        self,
+        project_id: int,
+        org_id: str = SENTINEL_ORG_ID,
+    ) -> int:
+        """Return total number of test runs for a project."""
+        async with AsyncSession(self._engine) as session:
+            from sqlalchemy import func
+
+            stmt = (
+                select(func.count())
+                .select_from(TestRun)
+                .where(
+                    col(TestRun.project_id) == project_id,
+                    col(TestRun.org_id) == org_id,
+                )
+            )
+            result = await session.execute(stmt)
+            return result.scalar_one()

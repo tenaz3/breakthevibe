@@ -21,10 +21,25 @@ router = APIRouter(tags=["pages"])
 @router.get("/", response_class=HTMLResponse)
 async def projects_page(
     request: Request,
+    page: int = 1,
     tenant: TenantContext = Depends(get_tenant),
 ) -> HTMLResponse:
-    projects = await project_repo.list_all(org_id=tenant.org_id)
-    return templates.TemplateResponse(request, "projects.html", {"projects": projects})
+    per_page = 24
+    offset = (max(1, page) - 1) * per_page
+    projects = await project_repo.list_all(org_id=tenant.org_id, limit=per_page, offset=offset)
+    total = await project_repo.count(org_id=tenant.org_id)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    return templates.TemplateResponse(
+        request,
+        "projects.html",
+        {
+            "projects": projects,
+            "page": max(1, page),
+            "total_pages": total_pages,
+            "total": total,
+            "base_url": "/",
+        },
+    )
 
 
 @router.get("/projects/{project_id}", response_class=HTMLResponse)
@@ -73,6 +88,7 @@ async def sitemap_page(
 async def test_runs_page(
     request: Request,
     project_id: int,
+    page: int = 1,
     tenant: TenantContext = Depends(get_tenant),
 ) -> HTMLResponse:
     project = await project_repo.get(str(project_id), org_id=tenant.org_id)
@@ -87,8 +103,25 @@ async def test_runs_page(
             },
             status_code=404,
         )
-    runs = await test_run_repo.list_for_project(project_id, org_id=tenant.org_id)
-    return templates.TemplateResponse(request, "test_runs.html", {"project": project, "runs": runs})
+    per_page = 24
+    offset = (max(1, page) - 1) * per_page
+    runs = await test_run_repo.list_for_project(
+        project_id, org_id=tenant.org_id, limit=per_page, offset=offset
+    )
+    total = await test_run_repo.count_for_project(project_id, org_id=tenant.org_id)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    return templates.TemplateResponse(
+        request,
+        "test_runs.html",
+        {
+            "project": project,
+            "runs": runs,
+            "page": max(1, page),
+            "total_pages": total_pages,
+            "total": total,
+            "base_url": f"/projects/{project_id}/runs",
+        },
+    )
 
 
 @router.get("/projects/{project_id}/suites", response_class=HTMLResponse)
