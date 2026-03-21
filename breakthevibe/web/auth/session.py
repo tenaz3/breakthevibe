@@ -86,13 +86,13 @@ class SessionAuth:
         now = datetime.now(UTC).replace(tzinfo=None)
         engine = get_engine()
         async with AsyncSession(engine) as db:
-            result = await db.exec(  # type: ignore[call-overload]
+            result = await db.execute(
                 select(DbSession).where(
                     DbSession.id == raw_token,
                     DbSession.expires_at > now,
                 )
             )
-            row = result.first()
+            row = result.scalars().first()
 
         if row is None:
             return None

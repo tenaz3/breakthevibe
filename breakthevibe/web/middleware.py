@@ -55,7 +55,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     # Default per-prefix limits (req / window_seconds).
     # Evaluated most-specific-first (longest prefix wins).
     _DEFAULT_RATE_LIMITS: dict[str, int] = {
-        "/api/auth/": 10,
+        "/api/auth/": 30,
         "/api/": 60,
     }
 
