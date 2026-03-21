@@ -631,6 +631,18 @@ details.accordion summary {
     list-style: none;
 }
 
+details.accordion summary::after {
+    content: '\203A';
+    font-size: 1.25rem;
+    line-height: 1;
+    transform: rotate(90deg);
+    transition: transform 0.2s ease-out;
+}
+
+details.accordion[open] summary::after {
+    transform: rotate(270deg);
+}
+
 details.accordion summary::-webkit-details-marker { display: none; }
 
 details.accordion[open] summary {
@@ -1070,4 +1082,17 @@ fieldset.field-group legend {
     .pagination-info {
         order: 1;
     }
+}
+
+/* ─── Skeleton Loading ─────────────────────────────────────── */
+.skeleton {
+    background: linear-gradient(90deg, var(--muted) 25%, var(--secondary) 50%, var(--muted) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+    border-radius: var(--radius);
+}
+
+@keyframes skeleton-pulse {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}BreakTheVibe{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
 
     <!-- Theme init (prevent flash) -->
     <script>
@@ -179,6 +180,12 @@
     document.getElementById('confirm-action').addEventListener('click', function() {
         if (confirmCallback) confirmCallback();
         closeConfirmDialog();
+    });
+
+    /* Focus management for accessibility */
+    document.addEventListener('htmx:afterSettle', function() {
+        var h1 = document.querySelector('main h1');
+        if (h1) { h1.setAttribute('tabindex', '-1'); h1.focus({ preventScroll: true }); }
     });
     </script>
     {% block scripts %}{% endblock %}

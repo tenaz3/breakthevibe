@@ -184,11 +184,23 @@ function setView(mode) {
     localStorage.setItem('btv-project-view', mode);
 }
 
+/* Update pagination links with current view */
+function updatePaginationLinks() {
+    var mode = localStorage.getItem('btv-project-view') || 'grid';
+    document.querySelectorAll('.pagination a').forEach(function(a) {
+        var url = new URL(a.href);
+        url.searchParams.set('view', mode);
+        a.href = url.toString();
+    });
+}
+
 /* Restore saved view preference */
 (function() {
     var saved = localStorage.getItem('btv-project-view');
     if (saved === 'list') setView('list');
 })();
+
+document.addEventListener('DOMContentLoaded', updatePaginationLinks);
 
 function deleteProject(id, name) {
     openConfirmDialog(

@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Mind-Map — {{ project.name }}{% endblock %}
 {% block head %}
-<script src="https://d3js.org/d3.v7.min.js" crossorigin="anonymous"></script>
 {% endblock %}
 {% block content %}
 <a href="/projects/{{ project.id }}" class="back-link">
@@ -9,7 +8,7 @@
     {{ project.name }}
 </a>
 
-<div class="page-header mb-6">
+<div class="page-header">
     <h1>Site Mind-Map</h1>
 </div>
 
@@ -19,5 +18,21 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/mindmap.js"></script>
+<script>
+var d3Loaded = false;
+function loadMindmap() {
+    if (d3Loaded) return;
+    d3Loaded = true;
+    var s = document.createElement('script');
+    s.src = 'https://d3js.org/d3.v7.min.js';
+    s.onload = function() {
+        var m = document.createElement('script');
+        m.src = '/static/js/mindmap.js';
+        document.body.appendChild(m);
+    };
+    document.body.appendChild(s);
+}
+/* Load immediately since this is a dedicated mindmap page */
+document.addEventListener('DOMContentLoaded', loadMindmap);
+</script>
 {% endblock %}
