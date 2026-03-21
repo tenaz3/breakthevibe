@@ -78,9 +78,11 @@
     }
 
     function render(data) {
-        const width = container.clientWidth;
-        const height = container.clientHeight;
-        const margin = { top: 20, right: 120, bottom: 20, left: 120 };
+        const width = Math.max(container.clientWidth, 800);
+        const nodeCount = (data.pages || []).length;
+        const height = Math.max(container.clientHeight, nodeCount * 40 + 200, 600);
+        container.style.height = height + "px";
+        const margin = { top: 20, right: 160, bottom: 20, left: 160 };
 
         const svg = d3
             .select(container)

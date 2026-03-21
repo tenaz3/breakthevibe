@@ -151,6 +151,16 @@
     --toast-shadow: rgba(0, 0, 0, 0.3);
 }
 
+/* ─── App Container ────────────────────────────────────────── */
+.container-app {
+    width: 100%;
+    max-width: 1600px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: clamp(1.5rem, 4vw, 5rem);
+    padding-right: clamp(1.5rem, 4vw, 5rem);
+}
+
 /* ─── Base Reset ────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

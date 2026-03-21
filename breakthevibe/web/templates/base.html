@@ -59,7 +59,7 @@
         }
     </script>
 
-    <link rel="stylesheet" href="/static/css/style.css?v=2">
+    <link rel="stylesheet" href="/static/css/style.css?v=3">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx-ext-json-enc@2.0.1/json-enc.js"></script>
     {% block head %}{% endblock %}
@@ -68,7 +68,7 @@
     {% block nav %}
     <!-- Navigation -->
     <nav class="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
-        <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div class="container-app h-14 flex items-center justify-between">
             <a href="/" class="font-bold text-[0.9375rem] tracking-tight text-foreground hover:opacity-70 transition-opacity">
                 BreakTheVibe
             </a>
@@ -98,7 +98,7 @@
     {% endblock nav %}
 
     {% block body_content %}
-    <main class="max-w-6xl mx-auto px-6 py-8 animate-fade-in">
+    <main class="container-app py-8 animate-fade-in">
         {% block content %}{% endblock %}
     </main>
     {% endblock body_content %}
