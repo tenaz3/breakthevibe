@@ -12,6 +12,7 @@ from pydantic import BaseModel, ValidationError
 
 from breakthevibe.audit.logger import audit
 from breakthevibe.generator.rules.schema import RulesConfig
+from breakthevibe.utils.crypto import encrypt_value
 from breakthevibe.web.auth.rbac import get_tenant
 from breakthevibe.web.dependencies import llm_settings_repo, project_repo
 from breakthevibe.web.template_engine import templates
@@ -107,13 +108,15 @@ async def update_llm_settings(
     if form.get("default_model"):
         updates["default_model"] = str(form["default_model"])
 
-    # Save API keys (#13)
-    if form.get("anthropic_api_key"):
-        updates["anthropic_api_key"] = str(form["anthropic_api_key"])
-    if form.get("openai_api_key"):
-        updates["openai_api_key"] = str(form["openai_api_key"])
-    if form.get("google_api_key"):
-        updates["google_api_key"] = str(form["google_api_key"])
+    # Save API keys (#13) — encrypt sensitive values before persisting
+    _sensitive_keys = ("api_key", "secret")
+    for field in ("anthropic_api_key", "openai_api_key", "google_api_key"):
+        raw = form.get(field)
+        if raw:
+            value = str(raw)
+            if any(k in field for k in _sensitive_keys):
+                value = encrypt_value(value)
+            updates[field] = value
     if form.get("ollama_base_url"):
         updates["ollama_base_url"] = str(form["ollama_base_url"])
 

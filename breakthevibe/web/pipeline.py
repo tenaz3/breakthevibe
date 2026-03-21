@@ -25,6 +25,7 @@ from breakthevibe.reporter.collector import ResultCollector
 from breakthevibe.runner.executor import TestExecutor
 from breakthevibe.runner.parallel import ParallelScheduler
 from breakthevibe.storage.artifacts import ArtifactStore
+from breakthevibe.utils.crypto import decrypt_value
 
 logger = structlog.get_logger(__name__)
 
@@ -91,10 +92,19 @@ async def build_pipeline(
                 )
                 model = None  # Let the provider use its built-in default
 
-        # Try provider from settings, then fall back to env
-        api_key = llm_settings.get("anthropic_api_key") or settings.anthropic_api_key
-        openai_key = llm_settings.get("openai_api_key") or settings.openai_api_key
-        google_key = llm_settings.get("google_api_key") or settings.google_api_key
+        # Try provider from settings (decrypt encrypted values), then fall back to env
+        _raw_anthropic = llm_settings.get("anthropic_api_key")
+        _raw_openai = llm_settings.get("openai_api_key")
+        _raw_google = llm_settings.get("google_api_key")
+        api_key = (
+            decrypt_value(_raw_anthropic) if _raw_anthropic else None
+        ) or settings.anthropic_api_key
+        openai_key = (
+            decrypt_value(_raw_openai) if _raw_openai else None
+        ) or settings.openai_api_key
+        google_key = (
+            decrypt_value(_raw_google) if _raw_google else None
+        ) or settings.google_api_key
         ollama_url = llm_settings.get("ollama_base_url") or settings.ollama_base_url
 
         # Explicit provider selection — fail clearly if the key is missing
