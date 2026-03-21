@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 
+from breakthevibe.agent.orchestrator import PipelineStage
 from breakthevibe.audit.logger import audit
 from breakthevibe.web.auth.rbac import get_tenant
 from breakthevibe.web.dependencies import project_repo, run_pipeline
@@ -36,6 +37,7 @@ async def trigger_generate(
         url=project["url"],
         rules_yaml=project.get("rules_yaml", ""),
         org_id=tenant.org_id,
+        stages=[PipelineStage.CRAWL, PipelineStage.MAP, PipelineStage.GENERATE],
         request_id=request.headers.get("x-request-id"),
     )
 
@@ -74,6 +76,7 @@ async def trigger_run(
         url=project["url"],
         rules_yaml=project.get("rules_yaml", ""),
         org_id=tenant.org_id,
+        stages=[PipelineStage.RUN, PipelineStage.REPORT],
         request_id=request.headers.get("x-request-id"),
     )
 

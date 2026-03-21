@@ -7,6 +7,7 @@ from typing import Any
 
 import structlog
 
+from breakthevibe.agent.orchestrator import PipelineStage
 from breakthevibe.config.settings import SENTINEL_ORG_ID, get_settings
 from breakthevibe.storage.database import get_engine
 from breakthevibe.storage.repositories.crawl_runs import CrawlRunRepository
@@ -59,18 +60,34 @@ def _get_pipeline_lock(org_id: str, project_id: str) -> asyncio.Lock:
     return _pipeline_locks.setdefault(key, asyncio.Lock())
 
 
+ALL_STAGES: list[PipelineStage] = list(PipelineStage)
+
+
 async def run_pipeline(
     project_id: str,
     url: str,
     rules_yaml: str = "",
     org_id: str = SENTINEL_ORG_ID,
+    stages: list[PipelineStage] | None = None,
     request_id: str | None = None,
 ) -> None:
-    """Run the full pipeline as a background task."""
+    """Run a (possibly partial) pipeline as a background task.
+
+    Args:
+        project_id: The project identifier.
+        url: The target URL.
+        rules_yaml: Optional YAML rules for the pipeline.
+        org_id: Organisation identifier for multi-tenant scoping.
+        stages: Ordered list of ``PipelineStage`` values to execute.
+            Defaults to all five stages when ``None``.
+        request_id: Optional request correlation ID for structured logging.
+    """
     import structlog.contextvars
 
     from breakthevibe.web.pipeline import build_pipeline
     from breakthevibe.web.sse import PipelineProgressEvent, progress_bus
+
+    active_stages = stages if stages is not None else ALL_STAGES
 
     if request_id:
         structlog.contextvars.bind_contextvars(request_id=request_id)
@@ -94,6 +111,7 @@ async def run_pipeline(
                 project_id=project_id,
                 org_id=org_id,
                 url=url,
+                stages=[s.value for s in active_stages],
             )
 
             # Clear stale progress state from any previous run
@@ -122,6 +140,7 @@ async def run_pipeline(
                     url=url,
                     rules_yaml=rules_yaml,
                     org_id=org_id,
+                    active_stages=active_stages,
                 )
 
                 # Build rich result data including report details

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -79,8 +78,15 @@ class PipelineOrchestrator:
     def _emit(self, stage: str, status: str, error: str = "") -> None:
         """Fire progress callback if one is registered."""
         if self._progress_callback is not None:
-            with contextlib.suppress(Exception):
+            try:
                 self._progress_callback(stage, status, error)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "progress_callback_failed",
+                    stage=stage,
+                    status=status,
+                    error=str(exc),
+                )
 
     async def run(
         self,
@@ -88,8 +94,20 @@ class PipelineOrchestrator:
         url: str,
         rules_yaml: str = "",
         openapi_spec: dict[str, Any] | None = None,
+        org_id: str = SENTINEL_ORG_ID,
+        active_stages: list[PipelineStage] | None = None,
     ) -> PipelineResult:
-        """Execute the full pipeline."""
+        """Execute the pipeline, optionally restricted to a subset of stages.
+
+        Args:
+            project_id: The project identifier.
+            url: The target URL to crawl/test.
+            rules_yaml: Optional YAML rules for the pipeline.
+            openapi_spec: Optional OpenAPI spec for API testing.
+            org_id: The organisation identifier for multi-tenant scoping.
+            active_stages: Ordered list of stages to execute. Defaults to all
+                five stages when ``None``.
+        """
         run_id = str(uuid.uuid4())
         start = time.monotonic()
         completed: list[PipelineStage] = []
@@ -97,9 +115,19 @@ class PipelineOrchestrator:
         # Bind correlation ID for all logs within this pipeline run (#12)
         bind_contextvars(pipeline_run_id=run_id, pipeline_project_id=project_id)
 
-        logger.info("pipeline_started", project_id=project_id, run_id=run_id, url=url)
+        active_stages_set: set[PipelineStage] = (
+            set(active_stages) if active_stages is not None else set(PipelineStage)
+        )
 
-        stages = [
+        logger.info(
+            "pipeline_started",
+            project_id=project_id,
+            run_id=run_id,
+            url=url,
+            active_stages=[s.value for s in (active_stages or list(PipelineStage))],
+        )
+
+        all_stages = [
             (PipelineStage.CRAWL, self._run_crawl),
             (PipelineStage.MAP, self._run_map),
             (PipelineStage.GENERATE, self._run_generate),
@@ -107,89 +135,95 @@ class PipelineOrchestrator:
             (PipelineStage.REPORT, self._run_report),
         ]
 
+        stages = [(s, h) for s, h in all_stages if s in active_stages_set]
+
         context: dict[str, Any] = {
             "url": url,
             "rules_yaml": rules_yaml,
             "project_id": project_id,
             "run_id": run_id,
             "openapi_spec": openapi_spec,
+            "org_id": org_id,
         }
 
-        for stage, handler in stages:
-            success = False
-            last_error = ""
+        try:
+            for stage, handler in stages:
+                success = False
+                last_error = ""
 
-            for attempt in range(self.max_retries):
-                try:
-                    logger.info("stage_starting", stage=stage.value, attempt=attempt + 1)
-                    self._emit(stage.value, "started")
-                    await handler(context)
-                    self._emit(stage.value, "completed")
-                    completed.append(stage)
-                    success = True
-                    break
-                except Exception as e:
-                    last_error = str(e)
-                    logger.warning(
-                        "stage_failed",
-                        stage=stage.value,
-                        attempt=attempt + 1,
-                        error=last_error,
+                for attempt in range(self.max_retries):
+                    try:
+                        logger.info("stage_starting", stage=stage.value, attempt=attempt + 1)
+                        self._emit(stage.value, "started")
+                        await handler(context)
+                        self._emit(stage.value, "completed")
+                        completed.append(stage)
+                        success = True
+                        break
+                    except Exception as e:
+                        # Broad catch: pipeline stages (crawl, map, generate, run) raise
+                        # heterogeneous exception types; all must be caught to drive retry logic.
+                        last_error = str(e)
+                        logger.warning(
+                            "stage_failed",
+                            stage=stage.value,
+                            attempt=attempt + 1,
+                            error=last_error,
+                        )
+
+                        # Consult planner for smart retry decisions
+                        if self._planner and attempt < self.max_retries - 1:
+                            decision = await self._planner.analyze_failure(
+                                stage=stage,
+                                error=last_error,
+                                attempt=attempt + 1,
+                            )
+                            if not decision.should_retry:
+                                logger.info(
+                                    "planner_abort",
+                                    stage=stage.value,
+                                    reason=decision.reason,
+                                )
+                                break
+                            if decision.adjusted_params:
+                                context.update(decision.adjusted_params)
+                                logger.info(
+                                    "planner_retry",
+                                    stage=stage.value,
+                                    reason=decision.reason,
+                                    params=decision.adjusted_params,
+                                )
+
+                if not success:
+                    self._emit(stage.value, "failed", last_error)
+                    duration = time.monotonic() - start
+                    logger.error("pipeline_failed", stage=stage.value, error=last_error)
+                    return PipelineResult(
+                        project_id=project_id,
+                        run_id=run_id,
+                        success=False,
+                        completed_stages=completed,
+                        failed_stage=stage,
+                        error_message=last_error,
+                        duration_seconds=duration,
+                        report=context.get("report"),
+                        sitemap=context.get("sitemap"),
                     )
 
-                    # Consult planner for smart retry decisions
-                    if self._planner and attempt < self.max_retries - 1:
-                        decision = await self._planner.analyze_failure(
-                            stage=stage,
-                            error=last_error,
-                            attempt=attempt + 1,
-                        )
-                        if not decision.should_retry:
-                            logger.info(
-                                "planner_abort",
-                                stage=stage.value,
-                                reason=decision.reason,
-                            )
-                            break
-                        if decision.adjusted_params:
-                            context.update(decision.adjusted_params)
-                            logger.info(
-                                "planner_retry",
-                                stage=stage.value,
-                                reason=decision.reason,
-                                params=decision.adjusted_params,
-                            )
-
-            if not success:
-                self._emit(stage.value, "failed", last_error)
-                duration = time.monotonic() - start
-                logger.error("pipeline_failed", stage=stage.value, error=last_error)
-                unbind_contextvars("pipeline_run_id", "pipeline_project_id")
-                return PipelineResult(
-                    project_id=project_id,
-                    run_id=run_id,
-                    success=False,
-                    completed_stages=completed,
-                    failed_stage=stage,
-                    error_message=last_error,
-                    duration_seconds=duration,
-                    report=context.get("report"),
-                    sitemap=context.get("sitemap"),
-                )
-
-        self._emit("", "done")
-        duration = time.monotonic() - start
-        logger.info("pipeline_completed", run_id=run_id, duration=duration)
-        unbind_contextvars("pipeline_run_id", "pipeline_project_id")
-        return PipelineResult(
-            project_id=project_id,
-            run_id=run_id,
-            success=True,
-            completed_stages=completed,
-            duration_seconds=duration,
-            report=context.get("report"),
-            sitemap=context.get("sitemap"),
-        )
+            self._emit("", "done")
+            duration = time.monotonic() - start
+            logger.info("pipeline_completed", run_id=run_id, duration=duration)
+            return PipelineResult(
+                project_id=project_id,
+                run_id=run_id,
+                success=True,
+                completed_stages=completed,
+                duration_seconds=duration,
+                report=context.get("report"),
+                sitemap=context.get("sitemap"),
+            )
+        finally:
+            unbind_contextvars("pipeline_run_id", "pipeline_project_id")
 
     async def _run_crawl(self, context: dict[str, Any]) -> None:
         url = context["url"]
@@ -230,6 +264,8 @@ class PipelineOrchestrator:
                 session.add(crawl_run)
                 await session.commit()
         except Exception as e:
+            # Broad catch: DB persist is best-effort; SQLAlchemy, asyncpg, and
+            # serialization errors must not abort the pipeline.
             logger.warning("sitemap_persist_failed", error=str(e))
 
     async def _run_generate(self, context: dict[str, Any]) -> None:
