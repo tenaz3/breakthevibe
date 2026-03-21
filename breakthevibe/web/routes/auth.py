@@ -29,7 +29,7 @@ async def login_page(request: Request) -> HTMLResponse:
     """Render the login page (password or passkey depending on auth_mode)."""
     auth = get_session_auth()
     token = request.cookies.get("session")
-    if token and auth.validate_session(token):
+    if token and await auth.validate_session(token):
         return RedirectResponse(url="/", status_code=302)  # type: ignore[return-value]
 
     settings = get_settings()
@@ -85,7 +85,7 @@ async def login(body: LoginRequest, request: Request, response: Response) -> dic
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     auth = get_session_auth()
-    token = auth.create_session(body.username)
+    token = await auth.create_session(body.username)
 
     response.set_cookie(
         key="session",
@@ -185,6 +185,20 @@ async def passkey_register_complete(
     if passkey_service is None or user_repo is None:
         raise HTTPException(status_code=500, detail="Passkey service not configured")
 
+    # Guard against race condition: two concurrent register/begin requests can both
+    # see has_credentials=False and both attempt to create the first admin account.
+    # Re-check atomically here before persisting the credential.
+    has_credentials = await passkey_service.has_any_credentials()
+    if has_credentials:
+        logger.warning(
+            "passkey_registration_race_condition",
+            user_id=body.user_id,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail="Another registration completed first. Contact an admin for an invite.",
+        )
+
     try:
         await passkey_service.complete_registration(
             user_id=body.user_id,
@@ -208,7 +222,7 @@ async def passkey_register_complete(
     role = org_role[1] if org_role else "admin"
 
     auth = get_session_auth()
-    token = auth.create_session(
+    token = await auth.create_session(
         user.email,
         user_id=user.id,
         org_id=org_id,
@@ -300,7 +314,7 @@ async def passkey_authenticate_complete(
     role = org_role[1] if org_role else "admin"
 
     auth = get_session_auth()
-    token = auth.create_session(
+    token = await auth.create_session(
         user.email,
         user_id=user.id,
         org_id=org_id,
@@ -358,7 +372,7 @@ async def logout(request: Request, response: Response) -> dict[str, str]:
     auth = get_session_auth()
     token = request.cookies.get("session")
     if token:
-        auth.destroy_session(token)
+        await auth.destroy_session(token)
     response.delete_cookie("session")
     await audit(
         org_id=SENTINEL_ORG_ID,

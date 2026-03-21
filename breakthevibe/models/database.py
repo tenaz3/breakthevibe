@@ -257,3 +257,19 @@ class LlmSetting(SQLModel, table=True):
     key: str = Field(index=True)
     value_json: str
     updated_at: datetime = Field(default_factory=_utc_now)
+
+
+# ---------------------------------------------------------------------------
+# Sessions
+# ---------------------------------------------------------------------------
+
+
+class Session(SQLModel, table=True):
+    __tablename__ = "sessions"
+
+    id: str = Field(primary_key=True)  # raw session token (unsigned)
+    user_id: str = Field(index=True)
+    org_id: str = Field(default=SENTINEL_ORG_ID)
+    data_json: str = Field(default="{}")  # JSON blob for extra session data
+    created_at: datetime = Field(default_factory=_utc_now)
+    expires_at: datetime = Field(index=True)

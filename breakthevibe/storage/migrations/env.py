@@ -17,6 +17,7 @@ from breakthevibe.models.database import (  # noqa: F401
     OrganizationMembership,
     Project,
     Route,
+    Session,
     Subscription,
     TestCase,
     TestResult,

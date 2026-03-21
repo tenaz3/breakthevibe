@@ -1,83 +1,171 @@
-"""Cookie-based session authentication."""
+"""Cookie-based session authentication backed by the database."""
 
 from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import secrets
-import time
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
 from fastapi import HTTPException, Request
+from sqlalchemy import delete, select
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from breakthevibe.config.settings import SENTINEL_ORG_ID
+from breakthevibe.models.database import Session as DbSession
 
 logger = structlog.get_logger(__name__)
 
+_DEFAULT_MAX_AGE_HOURS = 24
+
 
 class SessionAuth:
-    """Simple cookie-based session management."""
+    """Database-backed cookie session management.
 
-    def __init__(self, secret_key: str, max_age: int = 86400) -> None:
+    The cookie value is token.hmac_signature so the server can verify it
+    has not been tampered with before hitting the database.
+    """
+
+    def __init__(self, secret_key: str, max_age_hours: int = _DEFAULT_MAX_AGE_HOURS) -> None:
         self._secret = secret_key.encode()
-        self._max_age = max_age
-        self._sessions: dict[str, dict[str, Any]] = {}
+        self._max_age_hours = max_age_hours
 
-    def create_session(self, username: str, **extra: Any) -> str:
-        """Create a new session and return the token.
+    async def create_session(self, username: str, **extra: Any) -> str:
+        """Insert a new session row and return the signed cookie value.
 
-        Extra kwargs (user_id, org_id, role, email) are stored in the session
-        dict alongside ``username`` and ``created_at``.
+        Args:
+            username: Human-readable identifier stored in session data.
+            **extra: Additional fields (user_id, org_id, role, email) stored
+                     in the session data_json blob.
+
+        Returns:
+            Signed cookie value token.signature.
         """
-        token = secrets.token_urlsafe(32)
-        signature = self._sign(token)
-        signed_token = f"{token}.{signature}"
+        from breakthevibe.storage.database import get_engine
 
-        self._sessions[signed_token] = {
-            "username": username,
-            "created_at": time.time(),
-            **extra,
-        }
-        logger.info("session_created", username=username)
-        return signed_token
+        raw_token = secrets.token_urlsafe(32)
+        expires = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=self._max_age_hours)
 
-    def validate_session(self, token: str) -> dict[str, Any] | None:
-        """Validate a session token and return user data."""
-        if not token or "." not in token:
+        data: dict[str, Any] = {"username": username, **extra}
+        org_id: str = str(extra.get("org_id", SENTINEL_ORG_ID))
+        user_id: str = str(extra.get("user_id", username))
+
+        db_session = DbSession(
+            id=raw_token,
+            user_id=user_id,
+            org_id=org_id,
+            data_json=json.dumps(data),
+            expires_at=expires,
+        )
+
+        engine = get_engine()
+        async with AsyncSession(engine) as db, db.begin():
+            db.add(db_session)
+
+        logger.info("session_created", username=username, user_id=user_id)
+        return self._sign_token(raw_token)
+
+    async def validate_session(self, token: str) -> dict[str, Any] | None:
+        """Validate a signed cookie value and return session data.
+
+        Args:
+            token: The signed cookie value token.signature.
+
+        Returns:
+            Session data dict, or None if invalid or expired.
+        """
+        raw_token = self._verify_signature(token)
+        if raw_token is None:
             return None
 
-        raw_token, signature = token.rsplit(".", 1)
-        expected_sig = self._sign(raw_token)
+        from breakthevibe.storage.database import get_engine
 
-        if not hmac.compare_digest(signature, expected_sig):
+        now = datetime.now(UTC).replace(tzinfo=None)
+        engine = get_engine()
+        async with AsyncSession(engine) as db:
+            result = await db.exec(  # type: ignore[call-overload]
+                select(DbSession).where(
+                    DbSession.id == raw_token,
+                    DbSession.expires_at > now,
+                )
+            )
+            row = result.first()
+
+        if row is None:
             return None
 
-        session = self._sessions.get(token)
-        if not session:
+        try:
+            return json.loads(row.data_json)  # type: ignore[no-any-return]
+        except (json.JSONDecodeError, AttributeError):
+            logger.warning("session_data_corrupt", raw_token=raw_token)
             return None
 
-        # Check expiry
-        if time.time() - session["created_at"] > self._max_age:
-            self.destroy_session(token)
-            return None
+    async def destroy_session(self, token: str) -> None:
+        """Delete a session row from the database.
 
-        return session
+        Args:
+            token: The signed cookie value token.signature.
+        """
+        raw_token = self._verify_signature(token)
+        if raw_token is None:
+            return
 
-    def destroy_session(self, token: str) -> None:
-        """Remove a session."""
-        self._sessions.pop(token, None)
+        from breakthevibe.storage.database import get_engine
+
+        engine = get_engine()
+        async with AsyncSession(engine) as db, db.begin():
+            await db.exec(  # type: ignore[call-overload]
+                delete(DbSession).where(DbSession.id == raw_token)
+            )
+
         logger.info("session_destroyed")
 
+    @staticmethod
+    async def cleanup_expired() -> int:
+        """Delete all expired sessions from the database.
+
+        Returns:
+            Number of rows deleted.
+        """
+        from breakthevibe.storage.database import get_engine
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        engine = get_engine()
+        async with AsyncSession(engine) as db, db.begin():
+            result = await db.exec(  # type: ignore[call-overload]
+                delete(DbSession).where(DbSession.expires_at <= now)
+            )
+        deleted: int = result.rowcount  # type: ignore[union-attr]
+        logger.info("expired_sessions_cleaned", count=deleted)
+        return deleted
+
+    def _sign_token(self, raw_token: str) -> str:
+        """Return token.signature."""
+        return f"{raw_token}.{self._sign(raw_token)}"
+
+    def _verify_signature(self, token: str) -> str | None:
+        """Verify HMAC signature and return the raw token, or None."""
+        if not token or "." not in token:
+            return None
+        raw_token, signature = token.rsplit(".", 1)
+        expected = self._sign(raw_token)
+        if not hmac.compare_digest(signature, expected):
+            return None
+        return raw_token
+
     def _sign(self, data: str) -> str:
-        """Create HMAC signature for a token."""
+        """Create a short HMAC-SHA256 signature."""
         return hmac.new(self._secret, data.encode(), hashlib.sha256).hexdigest()[:32]
 
 
-# Singleton instance — created lazily
 _auth_instance: SessionAuth | None = None
 
 
 def get_session_auth() -> SessionAuth:
-    """Get or create the session auth singleton."""
+    """Return (or lazily create) the process-wide SessionAuth singleton."""
     global _auth_instance  # noqa: PLW0603
     if _auth_instance is None:
         from breakthevibe.config.settings import get_settings
@@ -90,26 +178,26 @@ def get_session_auth() -> SessionAuth:
 async def require_auth(request: Request) -> dict[str, Any]:
     """FastAPI dependency that enforces session authentication.
 
-    Checks the 'session' cookie for a valid token.
+    Checks the session cookie for a valid signed token.
     Raises 401 if unauthenticated.
     """
     auth = get_session_auth()
     token = request.cookies.get("session")
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
-    user = auth.validate_session(token)
+    user = await auth.validate_session(token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
     return user
 
 
 async def require_auth_page(request: Request) -> dict[str, Any]:
-    """Like require_auth, but redirects to /login for browser page requests."""
+    """Like require_auth but redirects to /login for browser page requests."""
     from urllib.parse import quote
 
     auth = get_session_auth()
     token = request.cookies.get("session")
-    user = auth.validate_session(token) if token else None
+    user = await auth.validate_session(token) if token else None
     if not user:
         next_url = quote(str(request.url.path), safe="/")
         raise HTTPException(
