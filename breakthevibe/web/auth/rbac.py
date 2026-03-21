@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import structlog
 from fastapi import Depends, HTTPException, Request
 from sqlmodel import col, select
@@ -12,6 +14,12 @@ from breakthevibe.web.auth.session import require_auth
 from breakthevibe.web.tenant_context import TenantContext, get_single_tenant_context
 
 logger = structlog.get_logger(__name__)
+
+# Short-lived in-process cache for Clerk tenant resolution.
+# Reduces DB round-trips from 3 sequential SELECTs to 0 for repeated requests
+# within the TTL window (e.g. many API calls in a single page load).
+_tenant_cache: dict[tuple[str, str], tuple[TenantContext, float]] = {}
+_CACHE_TTL = 30.0  # seconds
 
 
 async def get_tenant(
@@ -71,7 +79,12 @@ def _resolve_passkey_tenant(user: dict[str, object]) -> TenantContext:
 
 
 async def _resolve_clerk_tenant(request: Request) -> TenantContext:
-    """Resolve tenant from Clerk JWT Bearer token."""
+    """Resolve tenant from Clerk JWT Bearer token.
+
+    Combines the previous 3 sequential SELECT queries (user, org, membership)
+    into a single JOIN query and caches the result for _CACHE_TTL seconds to
+    reduce database round-trips on hot paths.
+    """
     from breakthevibe.models.database import Organization, OrganizationMembership, User
     from breakthevibe.storage.database import get_engine
     from breakthevibe.web.auth.clerk import verify_clerk_token
@@ -84,42 +97,62 @@ async def _resolve_clerk_tenant(request: Request) -> TenantContext:
     try:
         claims = await verify_clerk_token(token)
     except Exception as exc:
+        # Broad catch: Clerk JWT verification raises PyJWT errors, httpx errors, and
+        # library-specific exceptions depending on the failure mode.
         logger.warning("clerk_token_invalid", error=str(exc))
         raise HTTPException(status_code=401, detail="Invalid token") from exc
 
-    # Look up user
+    if not claims.org_id:
+        raise HTTPException(status_code=400, detail="No organization context in token")
+
+    # Check short-lived cache before hitting the database.
+    cache_key = (claims.sub, claims.org_id)
+    cached = _tenant_cache.get(cache_key)
+    if cached and time.monotonic() - cached[1] < _CACHE_TTL:
+        return cached[0]
+
+    # Single JOIN query replacing 3 sequential SELECTs.
     async with AsyncSession(get_engine()) as session:
-        user_stmt = select(User).where(col(User.clerk_user_id) == claims.sub)
-        user_result = await session.execute(user_stmt)
-        user = user_result.scalars().first()
-        if not user or not user.is_active:
-            raise HTTPException(status_code=401, detail="User not found or inactive")
-
-        # Resolve org context
-        if not claims.org_id:
-            raise HTTPException(status_code=400, detail="No organization context in token")
-
-        org_stmt = select(Organization).where(col(Organization.clerk_org_id) == claims.org_id)
-        org_result = await session.execute(org_stmt)
-        org = org_result.scalars().first()
-        if not org:
-            raise HTTPException(status_code=404, detail="Organization not found")
-
-        # Check membership
-        mem_stmt = select(OrganizationMembership).where(
-            col(OrganizationMembership.org_id) == org.id,
-            col(OrganizationMembership.user_id) == user.id,
+        stmt = (
+            select(User, Organization, OrganizationMembership)
+            .join(
+                OrganizationMembership,
+                col(OrganizationMembership.user_id) == col(User.id),
+            )
+            .join(
+                Organization,
+                col(Organization.id) == col(OrganizationMembership.org_id),
+            )
+            .where(
+                col(User.clerk_user_id) == claims.sub,
+                col(Organization.clerk_org_id) == claims.org_id,
+            )
         )
-        mem_result = await session.execute(mem_stmt)
-        membership = mem_result.scalars().first()
-        if not membership:
-            raise HTTPException(status_code=403, detail="Not a member of this organization")
+        result = await session.execute(stmt)
+        row = result.first()
 
-        return TenantContext(
-            org_id=org.id,
-            user_id=user.id,
-            role=membership.role,
-            email=user.email,
-            clerk_org_id=claims.org_id,
+    if not row:
+        # Distinguish between "user not found", "org not found", and "not a member"
+        # with a generic 401/403 to avoid information leakage.
+        logger.warning(
+            "clerk_tenant_not_resolved",
             clerk_user_id=claims.sub,
+            clerk_org_id=claims.org_id,
         )
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    user, org, membership = row
+
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="User not found or inactive")
+
+    tenant = TenantContext(
+        org_id=org.id,
+        user_id=user.id,
+        role=membership.role,
+        email=user.email,
+        clerk_org_id=claims.org_id,
+        clerk_user_id=claims.sub,
+    )
+    _tenant_cache[cache_key] = (tenant, time.monotonic())
+    return tenant
