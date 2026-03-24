@@ -64,12 +64,12 @@
                             <td class="text-muted-foreground">{{ suite.step_count }}</td>
                             <td class="text-right">
                                 <button type="button" class="btn btn-ghost btn-sm"
-                                        onclick="toggleCode('code-{{ loop.index0 }}-{{ loop.parent.loop.index0 }}')">
+                                        onclick="toggleCode('code-{{ suite.name }}')">
                                     View Code
                                 </button>
                             </td>
                         </tr>
-                        <tr id="code-{{ loop.index0 }}-{{ loop.parent.loop.index0 }}" class="hidden">
+                        <tr id="code-{{ suite.name }}" class="hidden">
                             <td colspan="4" class="!p-0">
                                 <pre class="code-block m-3"><code>{{ suite.code }}</code></pre>
                             </td>
@@ -86,8 +86,8 @@
 <div class="card">
     <div class="empty-state">
         <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-        <p>No test suites generated yet</p>
-        <p>Run the pipeline to generate tests.</p>
+        <p>No test suites yet</p>
+        <p>Click <strong>Run Tests</strong> on the project page to generate and execute tests.</p>
     </div>
 </div>
 {% endif %}

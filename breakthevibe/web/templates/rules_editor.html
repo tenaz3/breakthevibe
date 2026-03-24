@@ -10,29 +10,71 @@
     <h1>Rules Editor</h1>
 </div>
 
+<!-- Template picker -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h3>Start from a Template</h3>
+    </div>
+    <div class="card-content">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <button type="button" class="template-card text-left p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer" data-template="ecommerce">
+                <p class="text-[0.8125rem] font-semibold text-foreground">E-Commerce Store</p>
+                <p class="text-[0.75rem] text-muted-foreground mt-1">Product pages, cart flow, checkout, search. Handles cookie banners and auth forms.</p>
+            </button>
+            <button type="button" class="template-card text-left p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer" data-template="saas">
+                <p class="text-[0.8125rem] font-semibold text-foreground">SaaS Dashboard</p>
+                <p class="text-[0.75rem] text-muted-foreground mt-1">Auth flows, dashboard views, settings, API endpoints. Sequential login tests.</p>
+            </button>
+            <button type="button" class="template-card text-left p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer" data-template="marketing">
+                <p class="text-[0.8125rem] font-semibold text-foreground">Marketing Site</p>
+                <p class="text-[0.75rem] text-muted-foreground mt-1">Landing pages, forms, visual regression. Broad crawl with analytics excluded.</p>
+            </button>
+            <button type="button" class="template-card text-left p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer" data-template="api">
+                <p class="text-[0.8125rem] font-semibold text-foreground">API-First App</p>
+                <p class="text-[0.75rem] text-muted-foreground mt-1">REST/GraphQL endpoints, status checks, response validation. Minimal UI crawling.</p>
+            </button>
+            <button type="button" class="template-card text-left p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer" data-template="blog">
+                <p class="text-[0.8125rem] font-semibold text-foreground">Blog / Content Site</p>
+                <p class="text-[0.75rem] text-muted-foreground mt-1">Deep crawl for articles, visual checks on content pages, skip admin/CMS.</p>
+            </button>
+            <button type="button" class="template-card text-left p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer" data-template="minimal">
+                <p class="text-[0.8125rem] font-semibold text-foreground">Minimal / Quick Scan</p>
+                <p class="text-[0.75rem] text-muted-foreground mt-1">Shallow crawl, fast execution. Good for a quick smoke test on any site.</p>
+            </button>
+        </div>
+    </div>
+</div>
+
 <form hx-put="/api/projects/{{ project.id }}/rules" hx-swap="none"
       hx-on::after-request="if(event.detail.successful){showToast('Rules saved','success')}else{showToast('Failed to save rules')}"
       enctype="application/x-www-form-urlencoded">
     <textarea name="rules_yaml" spellcheck="false" class="code-editor">{{ rules_yaml }}</textarea>
-    <div class="flex gap-3 mt-4">
+    <div class="flex flex-wrap gap-3 mt-4">
         <button type="submit" class="btn btn-primary">Save Rules</button>
         <button type="button" id="validate-btn" class="btn btn-secondary">Validate</button>
+        <button type="button" id="generate-rules-btn" class="btn btn-secondary">
+            <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            <span id="generate-rules-label">Generate from Mind-Map</span>
+            <svg id="generate-rules-spinner" class="hidden w-3.5 h-3.5 animate-spin ml-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        </button>
         <button type="button" id="reset-btn" class="btn btn-ghost">Reset to Defaults</button>
     </div>
 </form>
 
 <hr class="separator">
 
-<details class="accordion" open>
+<details class="accordion">
     <summary>Configuration Reference</summary>
     <pre id="default-config" class="accordion-content text-[0.8125rem] font-mono text-muted-foreground whitespace-pre-wrap">crawl:
   max_depth: 5           # Maximum crawl depth
   skip_urls: []          # Glob patterns to skip
   scroll_behavior: auto  # auto | none | full
-  viewport: [1280, 720]  # Width, height
+  viewport:
+    width: 1280          # Browser viewport width
+    height: 800          # Browser viewport height
   wait_times:
     page_load: 3000      # ms to wait after navigation
-    network_idle: 1000   # ms to wait for network idle
+    after_click: 1000    # ms to wait after click
 
 inputs:
   email: "test@example.com"
@@ -40,8 +82,8 @@ inputs:
 
 interactions:
   cookie_banner: dismiss
-  modals: close
-  infinite_scroll: false
+  modals: close_on_appear
+  infinite_scroll: scroll_3_times
 
 tests:
   skip_visual: ["*/admin/*"]
@@ -49,10 +91,11 @@ tests:
 api:
   ignore_endpoints: ["*/analytics*"]
   expected_overrides:
-    "GET /api/users": { status: 200 }
+    "GET /api/health": { status: 200 }
 
 execution:
   mode: smart           # smart | sequential | parallel
+  max_retries: 2
   suites:
     api_tests: { workers: 4 }</pre>
 </details>
@@ -91,5 +134,375 @@ document.getElementById('reset-btn')?.addEventListener('click', function() {
         }
     );
 });
+
+/* ── Generate Rules from Mind-Map ─────────────────────────── */
+document.getElementById('generate-rules-btn')?.addEventListener('click', function() {
+    var btn = this;
+    var label = document.getElementById('generate-rules-label');
+    var spinner = document.getElementById('generate-rules-spinner');
+    var editor = document.querySelector('[name=rules_yaml]');
+
+    function setLoading(loading) {
+        btn.disabled = loading;
+        label.textContent = loading ? 'Generating...' : 'Generate from Mind-Map';
+        spinner.classList.toggle('hidden', !loading);
+    }
+
+    function doGenerate() {
+        setLoading(true);
+        fetch('/api/projects/{{ project.id }}/generate-rules', { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                setLoading(false);
+                if (data.status === 'ok') {
+                    editor.value = data.rules_yaml;
+                    showToast('Rules generated from your sitemap', 'success');
+                } else if (data.detail) {
+                    showToast(data.detail, 'error');
+                } else {
+                    showToast(data.error || 'Failed to generate rules', 'error');
+                }
+            })
+            .catch(function(err) {
+                setLoading(false);
+                showToast('Generation failed: ' + err.message, 'error');
+            });
+    }
+
+    if (editor.value.trim()) {
+        openConfirmDialog(
+            'Generate Rules',
+            'This will replace your current rules with AI-generated rules based on your site\'s mind-map.',
+            'Generate',
+            doGenerate
+        );
+    } else {
+        doGenerate();
+    }
+});
+
+/* ── Rule Templates ──────────────────────────────────────── */
+var TEMPLATES = {
+ecommerce: `# E-Commerce Store — full product + checkout coverage
+crawl:
+  max_depth: 8
+  skip_urls:
+    - "/admin/*"
+    - "/api/internal/*"
+    - "/account/orders/*"
+  scroll_behavior: incremental
+  wait_times:
+    page_load: 3000
+    after_click: 1500
+  viewport:
+    width: 1280
+    height: 800
+
+inputs:
+  email: "qa-buyer@example.com"
+  password: "Test123!"
+  first_name: "Test"
+  last_name: "User"
+  address: "123 Test Street"
+  city: "San Francisco"
+  zip: "94102"
+  phone: "+14155551234"
+  card_number: "4242424242424242"
+  card_expiry: "12/28"
+  card_cvc: "123"
+
+interactions:
+  cookie_banner: dismiss
+  modals: close_on_appear
+  infinite_scroll: scroll_3_times
+
+tests:
+  skip_visual:
+    - "/checkout/confirmation"
+    - "/account/*"
+
+api:
+  ignore_endpoints:
+    - "/api/analytics/*"
+    - "/api/tracking/*"
+    - "/api/recommendations/*"
+  expected_overrides:
+    "GET /api/products": { status: 200 }
+    "GET /api/cart": { status: 200 }
+
+execution:
+  mode: smart
+  max_retries: 2
+  suites:
+    checkout-flow:
+      mode: sequential
+      shared_context: true
+    product-pages:
+      mode: parallel
+      workers: 4`,
+
+saas: `# SaaS Dashboard — auth flows, dashboard, settings, API
+crawl:
+  max_depth: 6
+  skip_urls:
+    - "/admin/*"
+    - "/api/webhooks/*"
+    - "/billing/invoices/*"
+  scroll_behavior: incremental
+  wait_times:
+    page_load: 3000
+    after_click: 1000
+  viewport:
+    width: 1440
+    height: 900
+
+inputs:
+  email: "qa-user@example.com"
+  password: "Test123!"
+  company: "Test Corp"
+  username: "qa-tester"
+
+interactions:
+  cookie_banner: dismiss
+  modals: close_on_appear
+
+tests:
+  skip_visual:
+    - "/settings/billing"
+    - "/onboarding/*"
+
+api:
+  ignore_endpoints:
+    - "/api/analytics/*"
+    - "/api/telemetry/*"
+  expected_overrides:
+    "GET /api/health": { status: 200 }
+    "GET /api/me": { status: 200 }
+
+execution:
+  mode: smart
+  max_retries: 3
+  suites:
+    auth-flow:
+      mode: sequential
+      shared_context: true
+    dashboard:
+      mode: parallel
+      workers: 3
+    settings:
+      mode: sequential`,
+
+marketing: `# Marketing Site — landing pages, forms, visual regression
+crawl:
+  max_depth: 4
+  skip_urls:
+    - "/blog/tag/*"
+    - "/blog/page/*"
+  scroll_behavior: incremental
+  wait_times:
+    page_load: 3000
+    after_click: 800
+  viewport:
+    width: 1280
+    height: 800
+
+inputs:
+  email: "qa-lead@example.com"
+  name: "Test User"
+  company: "Test Corp"
+  phone: "+14155551234"
+
+interactions:
+  cookie_banner: dismiss
+  modals: close_on_appear
+  infinite_scroll: scroll_3_times
+
+tests:
+  skip_visual: []
+
+api:
+  ignore_endpoints:
+    - "/api/analytics/*"
+    - "/api/tracking/*"
+    - "/api/hubspot/*"
+    - "/api/segment/*"
+
+execution:
+  mode: parallel
+  max_retries: 2
+  suites:
+    landing-pages:
+      mode: parallel
+      workers: 4
+    contact-forms:
+      mode: sequential
+      shared_context: true`,
+
+api: `# API-First App — REST/GraphQL endpoint testing
+crawl:
+  max_depth: 3
+  skip_urls:
+    - "/docs/*"
+    - "/swagger/*"
+  scroll_behavior: none
+  wait_times:
+    page_load: 2000
+    after_click: 500
+  viewport:
+    width: 1280
+    height: 800
+
+inputs:
+  email: "api-test@example.com"
+  api_key: "test-key-12345"
+
+interactions:
+  cookie_banner: dismiss
+
+tests:
+  skip_visual:
+    - "/*"
+
+api:
+  ignore_endpoints:
+    - "/api/metrics/*"
+    - "/api/internal/*"
+  expected_overrides:
+    "GET /api/health": { status: 200 }
+    "GET /api/v1/status": { status: 200 }
+
+execution:
+  mode: parallel
+  max_retries: 3
+  suites:
+    api-endpoints:
+      mode: parallel
+      workers: 6`,
+
+blog: `# Blog / Content Site — deep article crawl, visual checks
+crawl:
+  max_depth: 10
+  skip_urls:
+    - "/wp-admin/*"
+    - "/admin/*"
+    - "/cms/*"
+    - "/feed/*"
+    - "/tag/*"
+    - "/author/*/page/*"
+  scroll_behavior: incremental
+  wait_times:
+    page_load: 3000
+    after_click: 1000
+  viewport:
+    width: 1280
+    height: 800
+
+inputs:
+  email: "reader@example.com"
+  name: "Test Reader"
+
+interactions:
+  cookie_banner: dismiss
+  modals: close_on_appear
+  infinite_scroll: scroll_3_times
+
+tests:
+  skip_visual:
+    - "/wp-admin/*"
+    - "/search*"
+
+api:
+  ignore_endpoints:
+    - "/api/analytics/*"
+    - "/wp-json/wp/v2/users*"
+
+execution:
+  mode: parallel
+  max_retries: 2
+  suites:
+    articles:
+      mode: parallel
+      workers: 4`,
+
+minimal: `# Minimal / Quick Scan — shallow smoke test
+crawl:
+  max_depth: 2
+  skip_urls: []
+  scroll_behavior: none
+  wait_times:
+    page_load: 2000
+    after_click: 500
+  viewport:
+    width: 1280
+    height: 800
+
+inputs:
+  email: "test@example.com"
+
+interactions:
+  cookie_banner: dismiss
+
+tests:
+  skip_visual: []
+
+api:
+  ignore_endpoints:
+    - "/api/analytics/*"
+
+execution:
+  mode: parallel
+  max_retries: 1
+  suites:
+    smoke:
+      mode: parallel
+      workers: 4`
+};
+
+function highlightActiveTemplate() {
+    var editor = document.querySelector('[name=rules_yaml]');
+    var current = editor.value.trim();
+    document.querySelectorAll('.template-card').forEach(function(btn) {
+        var key = btn.dataset.template;
+        var tpl = (TEMPLATES[key] || '').trim();
+        if (tpl && current === tpl) {
+            btn.classList.add('border-primary', 'bg-primary/5', 'ring-1', 'ring-primary/30');
+            if (!btn.querySelector('.template-active-badge')) {
+                var badge = document.createElement('span');
+                badge.className = 'template-active-badge badge badge-info mt-1';
+                badge.style.fontSize = '0.625rem';
+                badge.textContent = 'Active';
+                btn.appendChild(badge);
+            }
+        } else {
+            btn.classList.remove('border-primary', 'bg-primary/5', 'ring-1', 'ring-primary/30');
+            var existing = btn.querySelector('.template-active-badge');
+            if (existing) existing.remove();
+        }
+    });
+}
+
+document.querySelectorAll('.template-card').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var key = this.dataset.template;
+        var tpl = TEMPLATES[key];
+        if (!tpl) return;
+        var editor = document.querySelector('[name=rules_yaml]');
+        if (editor.value.trim()) {
+            openConfirmDialog(
+                'Apply Template',
+                'This will replace your current rules with the "' + this.querySelector('.font-semibold').textContent + '" template.',
+                'Apply',
+                function() { editor.value = tpl; showToast('Template applied', 'success'); highlightActiveTemplate(); }
+            );
+        } else {
+            editor.value = tpl;
+            showToast('Template applied', 'success');
+            highlightActiveTemplate();
+        }
+    });
+});
+
+// Highlight on page load
+highlightActiveTemplate();
 </script>
 {% endblock %}
