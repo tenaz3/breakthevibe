@@ -1,32 +1,49 @@
-.PHONY: dev test lint format typecheck setup migrate
+.PHONY: install setup dev test test-unit test-integration lint format typecheck migrate migrate-new quality
 
-setup:
+# --- Setup ---
+
+install:
 	uv sync
-	playwright install chromium
+	uv run playwright install chromium
 
-dev: setup migrate
-	uv run uvicorn breakthevibe.web.app:create_app --factory --reload
+setup: install migrate
+
+# --- Development ---
+
+dev:
+	docker compose up -d db
+	@sleep 2
+	uv run alembic upgrade head
+	uv run uvicorn breakthevibe.web.app:create_app --factory --reload --port 8000
+
+# --- Testing ---
 
 test:
-	pytest -v
+	uv run pytest tests/ -v
 
 test-unit:
-	pytest -v -m unit
+	uv run pytest tests/unit/ -v
 
 test-integration:
-	pytest -v -m integration
+	uv run pytest tests/integration/ -v
+
+# --- Code Quality ---
 
 lint:
-	ruff check .
+	uv run ruff check breakthevibe/ tests/
 
 format:
-	ruff format .
+	uv run ruff format breakthevibe/ tests/
 
 typecheck:
-	mypy breakthevibe/
+	uv run mypy breakthevibe/ --strict
+
+quality: format lint test
+
+# --- Database ---
 
 migrate:
-	alembic upgrade head
+	uv run alembic upgrade head
 
 migrate-new:
-	alembic revision --autogenerate -m "$(msg)"
+	uv run alembic revision --autogenerate -m "$(msg)"
