@@ -80,10 +80,31 @@ async def project_detail_page(
         except (OSError, ValueError, KeyError):
             pass
 
+    # Check test case cache status
+    from breakthevibe.web.dependencies import crawl_run_repo, test_case_repo
+
+    try:
+        pid = int(project_id)
+    except (ValueError, TypeError):
+        pid = 0
+    cache_meta = await test_case_repo.get_cache_meta(pid, org_id=tenant.org_id)
+    cache_stale = False
+    if cache_meta:
+        latest_crawl = await crawl_run_repo.get_latest_for_project(pid, org_id=tenant.org_id)
+        cache_stale = (
+            latest_crawl is not None
+            and latest_crawl.get("sitemap_hash") != cache_meta["sitemap_hash"]
+        )
+
     return templates.TemplateResponse(
         request,
         "project_detail.html",
-        {"project": project, "llm_configured": llm_configured},
+        {
+            "project": project,
+            "llm_configured": llm_configured,
+            "cache_meta": cache_meta,
+            "cache_stale": cache_stale,
+        },
     )
 
 

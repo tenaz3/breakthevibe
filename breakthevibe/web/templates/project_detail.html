@@ -41,14 +41,25 @@
             <svg class="btn-icon w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
             <span class="btn-label">Generate</span>
         </button>
-        <button class="btn btn-primary" id="btn-run"
-                hx-post="/api/projects/{{ project.id }}/run"
+        {% if cache_meta %}
+        <button class="btn btn-primary" id="btn-run-cached"
+                hx-post="/api/projects/{{ project.id }}/run-cached"
                 hx-swap="none"
                 hx-disabled-elt="this"
-                hx-on::after-request="onPipelineTrigger(event, 'Test run started')">
+                hx-on::after-request="onPipelineTrigger(event, 'Re-running cached tests')">
             <svg class="btn-spinner hidden w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
             <svg class="btn-icon w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>
-            <span class="btn-label">Run Tests</span>
+            <span class="btn-label">Run ({{ cache_meta.count }} cached)</span>
+        </button>
+        {% endif %}
+        <button class="btn {% if cache_meta %}btn-secondary{% else %}btn-primary{% endif %}" id="btn-regenerate"
+                hx-post="/api/projects/{{ project.id }}/{% if cache_meta %}regenerate{% else %}run{% endif %}"
+                hx-swap="none"
+                hx-disabled-elt="this"
+                hx-on::after-request="onPipelineTrigger(event, '{% if cache_meta %}Regenerating tests{% else %}Test run started{% endif %}')">
+            <svg class="btn-spinner hidden w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            <svg class="btn-icon w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg>
+            <span class="btn-label">{% if cache_meta %}Regenerate{% else %}Run Tests{% endif %}</span>
         </button>
 
         <div class="separator-vertical"></div>
@@ -66,6 +77,35 @@
             Rules
         </a>
     </div>
+
+    <!-- LLM configuration warning -->
+    {% if not llm_configured %}
+    <div class="callout callout-warning mt-4" id="llm-warning">
+        <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+            <p class="text-[0.8125rem]">
+                <strong>No LLM provider configured.</strong>
+                Set <code class="text-[0.75rem]">ANTHROPIC_API_KEY</code>,
+                <code class="text-[0.75rem]">OPENAI_API_KEY</code>, or
+                <code class="text-[0.75rem]">GOOGLE_API_KEY</code> in your
+                <code class="text-[0.75rem]">.env</code> file to enable test generation.
+            </p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Cache freshness indicator -->
+    {% if cache_meta %}
+    <div class="flex items-center gap-2 mt-3 text-[0.75rem] text-muted-foreground">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        <span>{{ cache_meta.count }} tests cached</span>
+        {% if cache_stale %}
+        <span class="badge badge-warning" style="font-size:0.625rem">Site changed — regenerate recommended</span>
+        {% else %}
+        <span class="badge badge-success" style="font-size:0.625rem">Up to date</span>
+        {% endif %}
+    </div>
+    {% endif %}
 
     <!-- Progress card (hidden until pipeline starts) -->
     <div id="pipeline-progress" class="pipeline-progress-card hidden" aria-busy="false">
@@ -347,6 +387,89 @@
         return wrapper;
     }
 
+    function renderRunCard(run, isLatest) {
+        var isSuccess = run.status === 'completed';
+        var card = el('div', 'card card-content cursor-pointer hover:border-primary/40 transition-colors');
+        if (run.run_id) {
+            card.addEventListener('click', function() {
+                window.location.href = '/runs/' + run.run_id;
+            });
+        }
+
+        /* Header */
+        var header = el('div', 'flex items-center justify-between mb-3');
+        var left = el('div', 'flex items-center gap-3');
+        left.appendChild(svgIcon(
+            isSuccess
+                ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+                : 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z',
+            isSuccess ? 'w-4 h-4 text-success' : 'w-4 h-4 text-destructive'
+        ));
+        var info = el('div');
+        var label = isLatest ? 'Latest Run' : 'Run';
+        info.appendChild(el('p', 'text-[0.8125rem] font-medium text-foreground', label));
+        if (run.run_id) info.appendChild(el('p', 'text-[0.6875rem] text-muted-foreground font-mono', run.run_id.substring(0, 8)));
+        left.appendChild(info);
+        header.appendChild(left);
+
+        var rightGroup = el('div', 'flex items-center gap-2');
+        if (run.duration_seconds) {
+            rightGroup.appendChild(el('span', 'text-[0.6875rem] text-muted-foreground', formatDuration(run.duration_seconds)));
+        }
+        rightGroup.appendChild(el('span',
+            'badge ' + (isSuccess ? 'badge-success' : 'badge-destructive'),
+            run.status
+        ));
+        header.appendChild(rightGroup);
+        card.appendChild(header);
+
+        /* Test counts */
+        if (run.total > 0) {
+            var countsRow = el('div', 'flex items-center gap-4 mb-2');
+            countsRow.appendChild(el('span', 'text-[0.8125rem] font-medium text-foreground', run.total + ' tests'));
+            if (run.passed > 0) {
+                countsRow.appendChild(el('span', 'text-[0.8125rem] font-medium text-success', run.passed + ' passed'));
+            }
+            if (run.failed > 0) {
+                countsRow.appendChild(el('span', 'text-[0.8125rem] font-medium text-destructive', run.failed + ' failed'));
+            }
+            card.appendChild(countsRow);
+        } else if (isSuccess && !run.error_message) {
+            var zeroHint = el('div', 'callout callout-warning mt-1 mb-2');
+            zeroHint.appendChild(el('p', 'text-[0.75rem]',
+                '0 tests generated. Adjust your Rules to cover more routes.'
+            ));
+            card.appendChild(zeroHint);
+        }
+
+        /* Stages */
+        var stages = run.completed_stages || [];
+        if (stages.length > 0) {
+            var row = el('div', 'flex flex-wrap gap-1');
+            stages.forEach(function(s) {
+                row.appendChild(el('span', 'badge badge-success text-[0.625rem]', s));
+            });
+            card.appendChild(row);
+        }
+
+        /* Failed stage */
+        if (run.failed_stage) {
+            var failRow = el('div', 'mt-2 flex items-center gap-2');
+            failRow.appendChild(el('span', 'text-[0.6875rem] text-muted-foreground', 'Failed at:'));
+            failRow.appendChild(el('span', 'badge badge-destructive text-[0.625rem]', run.failed_stage));
+            card.appendChild(failRow);
+        }
+
+        /* Error */
+        if (run.error_message) {
+            var errWrap = el('div', 'callout callout-destructive mt-2');
+            errWrap.appendChild(el('p', 'text-[0.6875rem] font-mono break-all', run.error_message));
+            card.appendChild(errWrap);
+        }
+
+        return card;
+    }
+
     function renderTestRuns(data) {
         if (data.status === 'no_runs') {
             clearAndAppend('tab-runs', renderEmptyState(
@@ -357,62 +480,21 @@
             return;
         }
 
-        var isSuccess = data.status === 'completed';
-        var card = el('div', 'card card-content');
-
-        /* Header */
-        var header = el('div', 'flex items-center justify-between mb-4');
-        var left = el('div', 'flex items-center gap-3');
-        left.appendChild(svgIcon(
-            isSuccess
-                ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
-                : 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z',
-            isSuccess ? 'w-5 h-5 text-success' : 'w-5 h-5 text-destructive'
-        ));
-        var info = el('div');
-        info.appendChild(el('p', 'text-[0.8125rem] font-medium text-foreground', 'Latest Run'));
-        if (data.run_id) info.appendChild(el('p', 'text-[0.75rem] text-muted-foreground font-mono', data.run_id));
-        left.appendChild(info);
-        header.appendChild(left);
-
-        var badge = el('span',
-            'badge ' + (isSuccess ? 'badge-success' : 'badge-destructive'),
-            data.status
-        );
-        header.appendChild(badge);
-        card.appendChild(header);
-
-        /* Duration */
-        if (data.duration_seconds) {
-            card.appendChild(el('p', 'text-[0.75rem] text-muted-foreground mb-3', 'Duration: ' + formatDuration(data.duration_seconds)));
+        var runs = data.runs || [];
+        if (runs.length === 0) {
+            clearAndAppend('tab-runs', renderEmptyState(
+                'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+                'No test runs yet',
+                'Run the pipeline to see results here.'
+            ));
+            return;
         }
 
-        /* Stages */
-        var stages = data.completed_stages || [];
-        if (stages.length > 0) {
-            var row = el('div', 'flex flex-wrap gap-1.5');
-            stages.forEach(function(s) {
-                row.appendChild(el('span', 'badge badge-success', s));
-            });
-            card.appendChild(row);
-        }
-
-        /* Failed stage */
-        if (data.failed_stage) {
-            var failRow = el('div', 'mt-3 flex items-center gap-2');
-            failRow.appendChild(el('span', 'text-[0.75rem] text-muted-foreground', 'Failed at:'));
-            failRow.appendChild(el('span', 'badge badge-destructive', data.failed_stage));
-            card.appendChild(failRow);
-        }
-
-        /* Error */
-        if (data.error_message) {
-            var errWrap = el('div', 'callout callout-destructive mt-3');
-            errWrap.appendChild(el('p', 'text-[0.75rem] font-mono break-all', data.error_message));
-            card.appendChild(errWrap);
-        }
-
-        clearAndAppend('tab-runs', card);
+        var container = el('div', 'space-y-3');
+        runs.forEach(function(run, i) {
+            container.appendChild(renderRunCard(run, i === 0));
+        });
+        clearAndAppend('tab-runs', container);
     }
 
     function loadTestRuns() {
