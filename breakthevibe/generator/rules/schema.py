@@ -39,6 +39,7 @@ class InputRules(BaseModel):
 
 class InteractionRules(BaseModel):
     cookie_banner: str = "dismiss"
+    consent_page: str = "accept"  # accept | skip | ignore
     modals: str = "close_on_appear"
     infinite_scroll: str = "scroll_3_times"
 

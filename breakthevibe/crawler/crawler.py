@@ -290,9 +290,38 @@ class Crawler:
         return page_data
 
     async def _handle_interactions(self, page: Page) -> None:
-        """Handle cookie banners, modals, etc. based on rules."""
+        """Handle consent pages, cookie banners, modals, etc. based on rules."""
         if not self._rules:
             return
+
+        # Handle consent/GDPR gate pages (full-page redirects to /consent, /cookie-policy, etc.)
+        consent_action = self._rules.get_consent_page_action() if self._rules else "accept"
+        current_url = page.url
+        if consent_action == "accept" and (
+            "/consent" in current_url or "/cookie-policy" in current_url
+        ):
+            for selector in [
+                "button:has-text('Accept')",
+                "button:has-text('Agree')",
+                "button:has-text('Continue')",
+                "button:has-text('I agree')",
+                "button:has-text('Allow')",
+                "[data-testid='consent-accept']",
+                "form[action*='consent'] button[type='submit']",
+            ]:
+                try:
+                    locator = page.locator(selector).first
+                    if await locator.is_visible(timeout=2000):
+                        await locator.click()
+                        await page.wait_for_load_state("networkidle", timeout=5000)
+                        logger.info(
+                            "consent_page_accepted",
+                            url=current_url,
+                            selector=selector,
+                        )
+                        break
+                except PlaywrightError:
+                    continue
 
         # Dismiss cookie banners
         if self._rules.get_cookie_banner_action() == "dismiss":

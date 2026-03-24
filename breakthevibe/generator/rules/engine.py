@@ -65,6 +65,10 @@ class RulesEngine:
         """Get action for cookie banners."""
         return self._config.interactions.cookie_banner
 
+    def get_consent_page_action(self) -> str:
+        """Get action for consent/GDPR gate pages."""
+        return self._config.interactions.consent_page
+
     def get_modal_action(self) -> str:
         """Get action for modals."""
         return self._config.interactions.modals
