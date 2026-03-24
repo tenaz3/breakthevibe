@@ -81,7 +81,7 @@ class TestCaseRepository:
                     col(TestCase.project_id) == project_id,
                     col(TestCase.org_id) == org_id,
                 )
-                .order_by(TestCase.id)  # type: ignore[attr-defined]
+                .order_by(col(TestCase.id))
             )
             result = await session.execute(stmt)
             rows = result.scalars().all()

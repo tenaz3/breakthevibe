@@ -12,6 +12,7 @@ from typing import Any
 import structlog
 from fastapi import HTTPException, Request
 from sqlalchemy import delete, select
+from sqlmodel import col
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from breakthevibe.config.settings import SENTINEL_ORG_ID
@@ -88,8 +89,8 @@ class SessionAuth:
         async with AsyncSession(engine) as db:
             result = await db.execute(
                 select(DbSession).where(
-                    DbSession.id == raw_token,
-                    DbSession.expires_at > now,
+                    col(DbSession.id) == raw_token,
+                    col(DbSession.expires_at) > now,
                 )
             )
             row = result.scalars().first()
@@ -117,9 +118,7 @@ class SessionAuth:
 
         engine = get_engine()
         async with AsyncSession(engine) as db, db.begin():
-            await db.exec(  # type: ignore[call-overload]
-                delete(DbSession).where(DbSession.id == raw_token)
-            )
+            await db.execute(delete(DbSession).where(col(DbSession.id) == raw_token))
 
         logger.info("session_destroyed")
 
@@ -135,10 +134,8 @@ class SessionAuth:
         now = datetime.now(UTC).replace(tzinfo=None)
         engine = get_engine()
         async with AsyncSession(engine) as db, db.begin():
-            result = await db.exec(  # type: ignore[call-overload]
-                delete(DbSession).where(DbSession.expires_at <= now)
-            )
-        deleted: int = result.rowcount  # type: ignore[union-attr]
+            result = await db.execute(delete(DbSession).where(col(DbSession.expires_at) <= now))
+        deleted: int = result.rowcount  # type: ignore[attr-defined]
         logger.info("expired_sessions_cleaned", count=deleted)
         return deleted
 

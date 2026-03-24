@@ -6,8 +6,9 @@ from typing import Any
 
 import structlog
 from aiobotocore.session import get_session
+from botocore.exceptions import BotoCoreError, ClientError
 
-from breakthevibe.storage.object_store import ObjectStore
+from breakthevibe.storage.object_store import ObjectStore, StorageError
 
 logger = structlog.get_logger(__name__)
 
@@ -37,29 +38,41 @@ class S3ObjectStore(ObjectStore):
 
     async def put(self, key: str, data: bytes) -> None:
         """Upload data to S3."""
-        async with self._session.create_client("s3", **self._config) as client:
-            await client.put_object(Bucket=self._bucket, Key=key, Body=data)
-        logger.debug("s3_put", key=key, size=len(data), bucket=self._bucket)
+        try:
+            async with self._session.create_client("s3", **self._config) as client:
+                await client.put_object(Bucket=self._bucket, Key=key, Body=data)
+            logger.debug("s3_put", key=key, size=len(data), bucket=self._bucket)
+        except (ClientError, BotoCoreError) as exc:
+            logger.error("s3_put_failed", key=key, bucket=self._bucket, error=str(exc))
+            raise StorageError(f"S3 put failed for key={key!r}: {exc}") from exc
 
     async def get(self, key: str) -> bytes | None:
         """Download data from S3. Returns None if not found."""
-        async with self._session.create_client("s3", **self._config) as client:
-            try:
-                resp = await client.get_object(Bucket=self._bucket, Key=key)
-                async with resp["Body"] as stream:
-                    data: bytes = await stream.read()
-                return data
-            except client.exceptions.NoSuchKey:
-                return None
+        try:
+            async with self._session.create_client("s3", **self._config) as client:
+                try:
+                    resp = await client.get_object(Bucket=self._bucket, Key=key)
+                    async with resp["Body"] as stream:
+                        data: bytes = await stream.read()
+                    return data
+                except client.exceptions.NoSuchKey:
+                    return None
+        except (ClientError, BotoCoreError) as exc:
+            logger.error("s3_get_failed", key=key, bucket=self._bucket, error=str(exc))
+            raise StorageError(f"S3 get failed for key={key!r}: {exc}") from exc
 
     async def delete(self, key: str) -> None:
         """Delete an object from S3."""
-        async with self._session.create_client("s3", **self._config) as client:
-            # If key looks like a prefix, delete all objects under it
-            if key.endswith("/"):
-                await self._delete_prefix(client, key)
-            else:
-                await client.delete_object(Bucket=self._bucket, Key=key)
+        try:
+            async with self._session.create_client("s3", **self._config) as client:
+                # If key looks like a prefix, delete all objects under it
+                if key.endswith("/"):
+                    await self._delete_prefix(client, key)
+                else:
+                    await client.delete_object(Bucket=self._bucket, Key=key)
+        except (ClientError, BotoCoreError) as exc:
+            logger.error("s3_delete_failed", key=key, bucket=self._bucket, error=str(exc))
+            raise StorageError(f"S3 delete failed for key={key!r}: {exc}") from exc
 
     async def _delete_prefix(self, client: Any, prefix: str) -> None:
         """Delete all objects under a prefix."""
@@ -73,19 +86,27 @@ class S3ObjectStore(ObjectStore):
     async def list_keys(self, prefix: str = "") -> list[str]:
         """List all keys under a prefix."""
         keys: list[str] = []
-        async with self._session.create_client("s3", **self._config) as client:
-            paginator = client.get_paginator("list_objects_v2")
-            async for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
-                for obj in page.get("Contents", []):
-                    keys.append(obj["Key"])
+        try:
+            async with self._session.create_client("s3", **self._config) as client:
+                paginator = client.get_paginator("list_objects_v2")
+                async for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
+                    for obj in page.get("Contents", []):
+                        keys.append(obj["Key"])
+        except (ClientError, BotoCoreError) as exc:
+            logger.error("s3_list_keys_failed", prefix=prefix, bucket=self._bucket, error=str(exc))
+            raise StorageError(f"S3 list_keys failed for prefix={prefix!r}: {exc}") from exc
         return sorted(keys)
 
     async def get_usage_bytes(self, prefix: str = "") -> int:
         """Get total storage usage in bytes for keys under prefix."""
         total = 0
-        async with self._session.create_client("s3", **self._config) as client:
-            paginator = client.get_paginator("list_objects_v2")
-            async for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
-                for obj in page.get("Contents", []):
-                    total += obj.get("Size", 0)
+        try:
+            async with self._session.create_client("s3", **self._config) as client:
+                paginator = client.get_paginator("list_objects_v2")
+                async for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
+                    for obj in page.get("Contents", []):
+                        total += obj.get("Size", 0)
+        except (ClientError, BotoCoreError) as exc:
+            logger.error("s3_get_usage_failed", prefix=prefix, bucket=self._bucket, error=str(exc))
+            raise StorageError(f"S3 get_usage_bytes failed for prefix={prefix!r}: {exc}") from exc
         return total

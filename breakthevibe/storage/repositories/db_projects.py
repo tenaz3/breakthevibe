@@ -81,7 +81,7 @@ class DatabaseProjectRepository:
                 select(func.count()).select_from(Project).where(col(Project.org_id) == org_id)
             )
             result = await session.execute(statement)
-            return result.scalar_one()
+            return int(result.scalar_one())
 
     async def get(self, project_id: str, org_id: str = SENTINEL_ORG_ID) -> dict[str, Any] | None:
         try:

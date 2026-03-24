@@ -68,6 +68,18 @@ plugins = ["pydantic.mypy"]
 module = ["aiobotocore", "aiobotocore.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["botocore", "botocore.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pytest_rerunfailures"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["breakthevibe.storage.migrations.*"]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

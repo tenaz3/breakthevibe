@@ -40,6 +40,7 @@ class TestRunRepository:
 
         success = run.status == "completed"
         return {
+            "project_id": run.project_id,
             "run_id": run.run_uuid,
             "success": success,
             "status": run.status,
@@ -175,4 +176,4 @@ class TestRunRepository:
                 )
             )
             result = await session.execute(stmt)
-            return result.scalar_one()
+            return int(result.scalar_one())

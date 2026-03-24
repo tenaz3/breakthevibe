@@ -73,7 +73,7 @@ def is_safe_url(url: str) -> bool:
         if not results:
             return False
         for _family, _type, _proto, _canonname, sockaddr in results:
-            ip_str = sockaddr[0]
+            ip_str = str(sockaddr[0])
             if _is_private_ip(ip_str):
                 logger.debug(
                     "is_safe_url_rejected_resolved_ip",
