@@ -4,6 +4,14 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+import structlog
+
+logger = structlog.get_logger(__name__)
+
+
+class StorageError(Exception):
+    """Raised when a storage operation fails."""
+
 
 class ObjectStore(ABC):
     """Abstract base class for object/blob storage."""
@@ -30,11 +38,32 @@ class ObjectStore(ABC):
 
 
 def create_object_store() -> ObjectStore:
-    """Factory: create the appropriate ObjectStore based on settings."""
+    """Factory: create the appropriate ObjectStore based on settings.
+
+    Validates required S3 configuration at startup when S3 storage is enabled,
+    raising StorageError immediately rather than failing on first use.
+    """
     from breakthevibe.config.settings import get_settings
 
     settings = get_settings()
     if settings.use_s3:
+        missing: list[str] = []
+        if not settings.s3_bucket:
+            missing.append("S3_BUCKET")
+        if not settings.s3_region:
+            missing.append("S3_REGION")
+        if missing:
+            msg = f"S3 storage is enabled but required config is missing: {', '.join(missing)}"
+            logger.error("s3_config_invalid", missing=missing)
+            raise StorageError(msg)
+
+        logger.info(
+            "s3_store_initialised",
+            bucket=settings.s3_bucket,
+            region=settings.s3_region,
+            endpoint=settings.s3_endpoint_url or "aws-default",
+        )
+
         from breakthevibe.storage.s3_store import S3ObjectStore
 
         return S3ObjectStore(

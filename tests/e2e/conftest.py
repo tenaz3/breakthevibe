@@ -25,6 +25,13 @@ os.environ.setdefault("USE_DATABASE", "false")
 @pytest.fixture()
 def app():
     """Create a fresh app instance for E2E tests."""
+    os.environ.setdefault("ADMIN_USERNAME", "testuser")
+    os.environ.setdefault("ADMIN_PASSWORD", "testpass")
+
+    from breakthevibe.config.settings import get_settings
+
+    get_settings.cache_clear()
+
     from breakthevibe.web.app import create_app
 
     return create_app()
@@ -43,8 +50,9 @@ async def authed_client(app):
     """Authenticated async client with valid session cookie."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        await c.post(
+        resp = await c.post(
             "/api/auth/login",
             json={"username": "testuser", "password": "testpass"},
         )
+        assert resp.status_code == 200, f"Login failed: {resp.status_code} {resp.text}"
         yield c

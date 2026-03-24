@@ -87,13 +87,155 @@ async def validate_rules(body: ValidateRulesRequest) -> dict[str, str | bool]:
         return {"valid": False, "error": str(e)}
 
 
+@router.post("/api/projects/{project_id}/generate-rules")
+async def generate_rules_from_sitemap(
+    project_id: str,
+    request: Request,
+    tenant: TenantContext = Depends(get_tenant),
+) -> dict[str, Any]:
+    """Use LLM to generate optimized rules YAML from the project's sitemap."""
+    from breakthevibe.web.dependencies import crawl_run_repo
+
+    project = await project_repo.get(project_id, org_id=tenant.org_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    sitemap = await crawl_run_repo.get_latest_sitemap(int(project_id), org_id=tenant.org_id)
+    if not sitemap:
+        raise HTTPException(
+            status_code=400,
+            detail="No sitemap found. Crawl the site first.",
+        )
+
+    # Resolve LLM provider
+    from breakthevibe.web.pipeline import _create_llm_for_rules
+
+    llm = await _create_llm_for_rules(org_id=tenant.org_id)
+    if not llm:
+        raise HTTPException(
+            status_code=400,
+            detail="No LLM provider configured. Set an API key in Settings.",
+        )
+
+    pages = sitemap.get("pages", [])
+    api_endpoints = sitemap.get("api_endpoints", [])
+
+    # Build a compact summary of the sitemap for the prompt
+    page_paths = [p.get("url", p.get("path", "")) for p in pages[:50]]
+    endpoint_summary = [f"{e.get('method', 'GET')} {e.get('path', '')}" for e in api_endpoints[:30]]
+
+    prompt = f"""Analyze this website's sitemap and generate an optimized \
+BreakTheVibe rules YAML configuration.
+
+Site URL: {project.get("url", "")}
+
+Discovered Pages ({len(pages)} total):
+{chr(10).join("- " + p for p in page_paths)}
+
+API Endpoints ({len(api_endpoints)} total):
+{chr(10).join("- " + e for e in endpoint_summary) if endpoint_summary else "- None discovered"}
+
+Generate a YAML rules configuration that:
+1. Sets appropriate crawl depth based on site structure
+2. Skips admin, internal, and non-essential URLs (analytics, tracking)
+3. Provides realistic form input values based on the site's purpose
+4. Configures interaction handling (cookie banners, modals)
+5. Sets smart execution modes (sequential for auth flows, parallel for independent pages)
+6. Skips visual tests on dynamic/personalized pages
+7. Ignores analytics/tracking API endpoints
+
+Return ONLY valid YAML, no markdown fences, no explanation. Use this exact structure:
+
+crawl:
+  max_depth: <number>
+  skip_urls: [<patterns>]
+  scroll_behavior: <incremental|none>
+  wait_times:
+    page_load: <ms>
+    after_click: <ms>
+  viewport:
+    width: <number>
+    height: <number>
+
+inputs:
+  <field>: "<value>"
+
+interactions:
+  cookie_banner: <dismiss|close_on_appear>
+  modals: <close_on_appear|dismiss>
+
+tests:
+  skip_visual: [<patterns>]
+
+api:
+  ignore_endpoints: [<patterns>]
+  expected_overrides:
+    "<METHOD> <path>": {{ status: <code> }}
+
+execution:
+  mode: <smart|parallel|sequential>
+  max_retries: <number>
+  suites:
+    <name>:
+      mode: <sequential|parallel>
+      workers: <number>
+"""
+
+    try:
+        logger.info(
+            "rules_generation_started",
+            project_id=project_id,
+            page_count=len(pages),
+            endpoint_count=len(api_endpoints),
+        )
+        response = await llm.generate(prompt)
+        logger.debug(
+            "rules_llm_response",
+            model=response.model,
+            tokens_used=response.tokens_used,
+            content_length=len(response.content),
+        )
+        rules_yaml = response.content.strip()
+        # Remove markdown fences if present
+        if rules_yaml.startswith("```"):
+            lines = rules_yaml.split("\n")
+            rules_yaml = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+        # Validate the generated YAML
+        RulesConfig.from_yaml(rules_yaml)
+        logger.info("rules_generation_succeeded", project_id=project_id)
+        return {"status": "ok", "rules_yaml": rules_yaml}
+    except (yaml.YAMLError, ValueError, ValidationError) as e:
+        logger.warning(
+            "generated_rules_invalid",
+            error=str(e),
+            raw_content=response.content[:500] if response else "",
+        )
+        return {"status": "error", "error": f"Generated rules were invalid: {e}"}
+    except Exception as e:
+        logger.error("rules_generation_failed", error=str(e), error_type=type(e).__name__)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.get("/settings/llm", response_class=HTMLResponse)
 async def llm_settings_page(
     request: Request,
     tenant: TenantContext = Depends(get_tenant),
 ) -> HTMLResponse:
     settings = await llm_settings_repo.get_all(org_id=tenant.org_id)
-    return templates.TemplateResponse(request, "llm_settings.html", {"settings": settings})
+    from breakthevibe.config.settings import get_settings
+
+    app_settings = get_settings()
+
+    # Build a dict of which providers have keys configured (DB or env)
+    key_status = {
+        "anthropic": bool(settings.get("anthropic_api_key") or app_settings.anthropic_api_key),
+        "openai": bool(settings.get("openai_api_key") or app_settings.openai_api_key),
+        "gemini": bool(settings.get("google_api_key") or app_settings.google_api_key),
+        "ollama": True,  # Ollama is always "available" (local)
+    }
+    return templates.TemplateResponse(
+        request, "llm_settings.html", {"settings": settings, "key_status": key_status}
+    )
 
 
 @router.put("/api/settings/llm")

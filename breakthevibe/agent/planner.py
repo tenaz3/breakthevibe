@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from breakthevibe.exceptions import LLMProviderError
+
 if TYPE_CHECKING:
     from breakthevibe.agent.orchestrator import PipelineStage
 
@@ -49,7 +51,7 @@ class AgentPlanner:
         try:
             response = await self._llm.generate(prompt=prompt)
             return self._parse_decision(response.content)
-        except Exception as e:
+        except LLMProviderError as e:
             logger.error("planner_llm_error", error=str(e))
             return RetryDecision(should_retry=False, reason=f"Planner error: {e}")
 

@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     google_api_key: str | None = None
     ollama_base_url: str = "http://localhost:11434"
 
+    @property
+    def llm_configured(self) -> bool:
+        """Return True if at least one LLM provider API key is set."""
+        return bool(self.anthropic_api_key or self.openai_api_key or self.google_api_key)
+
 
 _DEFAULT_SECRET_KEY = "change-me-in-production"  # nosec B105
 

@@ -84,6 +84,35 @@ document.addEventListener('DOMContentLoaded', function() {
     <h1>LLM Settings</h1>
 </div>
 
+<!-- Provider status indicators -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h3>Provider Status</h3>
+    </div>
+    <div class="card-content">
+        <div class="flex flex-wrap gap-3">
+            {% for provider, label in [('anthropic', 'Anthropic'), ('openai', 'OpenAI'), ('gemini', 'Google Gemini'), ('ollama', 'Ollama')] %}
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-md border
+                {% if key_status[provider] %}border-success/30 bg-success/5{% else %}border-border bg-muted/30{% endif %}">
+                <span class="w-2 h-2 rounded-full {% if key_status[provider] %}bg-success{% else %}bg-muted-foreground/30{% endif %}"></span>
+                <span class="text-[0.8125rem] font-medium
+                    {% if key_status[provider] %}text-success{% else %}text-muted-foreground{% endif %}">
+                    {{ label }}
+                </span>
+                <span class="text-[0.6875rem] text-muted-foreground">
+                    {% if key_status[provider] %}configured{% else %}not set{% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+        {% if not key_status.anthropic and not key_status.openai and not key_status.gemini %}
+        <div class="callout callout-warning mt-3">
+            <p class="text-[0.8125rem]">No API keys configured. Test generation requires at least one LLM provider.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 <form id="llm-settings-form" hx-put="/api/settings/llm" hx-swap="none"
       hx-on::before-request="setSaveState('saving')"
       hx-on::after-request="if(event.detail.successful){setSaveState('saved');showToast('Settings saved','success')}else{setSaveState('failed');showToast('Failed to save settings')}"
@@ -150,16 +179,25 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="card-content space-y-4">
             <p id="api-keys-help" class="text-[0.8125rem] text-muted-foreground">In production, use environment variables (<span class="font-mono text-[0.75rem]">ANTHROPIC_API_KEY</span>, <span class="font-mono text-[0.75rem]">OPENAI_API_KEY</span>, <span class="font-mono text-[0.75rem]">GOOGLE_API_KEY</span>).</p>
             <div>
-                <label for="anthropic-api-key" class="label">Anthropic API Key</label>
-                <input type="password" id="anthropic-api-key" name="anthropic_api_key" placeholder="sk-ant-..." class="input" aria-describedby="api-keys-help">
+                <label for="anthropic-api-key" class="label">
+                    Anthropic API Key
+                    {% if key_status.anthropic %}<span class="badge badge-success ml-2 text-[0.625rem]">configured</span>{% endif %}
+                </label>
+                <input type="password" id="anthropic-api-key" name="anthropic_api_key" placeholder="{% if key_status.anthropic %}••••••••{% else %}sk-ant-...{% endif %}" class="input" aria-describedby="api-keys-help">
             </div>
             <div>
-                <label for="openai-api-key" class="label">OpenAI API Key</label>
-                <input type="password" id="openai-api-key" name="openai_api_key" placeholder="sk-..." class="input" aria-describedby="api-keys-help">
+                <label for="openai-api-key" class="label">
+                    OpenAI API Key
+                    {% if key_status.openai %}<span class="badge badge-success ml-2 text-[0.625rem]">configured</span>{% endif %}
+                </label>
+                <input type="password" id="openai-api-key" name="openai_api_key" placeholder="{% if key_status.openai %}••••••••{% else %}sk-...{% endif %}" class="input" aria-describedby="api-keys-help">
             </div>
             <div>
-                <label for="google-api-key" class="label">Google Gemini API Key</label>
-                <input type="password" id="google-api-key" name="google_api_key" placeholder="AIza..." class="input" aria-describedby="api-keys-help">
+                <label for="google-api-key" class="label">
+                    Google Gemini API Key
+                    {% if key_status.gemini %}<span class="badge badge-success ml-2 text-[0.625rem]">configured</span>{% endif %}
+                </label>
+                <input type="password" id="google-api-key" name="google_api_key" placeholder="{% if key_status.gemini %}••••••••{% else %}AIza...{% endif %}" class="input" aria-describedby="api-keys-help">
             </div>
             <div>
                 <label for="ollama-base-url" class="label">Ollama Base URL</label>

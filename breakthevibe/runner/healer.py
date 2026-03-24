@@ -67,6 +67,9 @@ class SelectorHealer:
                         locator=locator,
                     )
             except Exception:
+                # Broad catch: Playwright raises PlaywrightError for most failures
+                # (element detached, timeout, navigation) but subclasses vary across
+                # versions; catching Exception ensures all locator errors are handled.
                 logger.debug(
                     "selector_error",
                     strategy=selector.strategy.value,

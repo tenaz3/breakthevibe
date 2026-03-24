@@ -42,11 +42,14 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql+asyncpg://breakthevibe:breakthevibe@localhost:5432/breakthevibe_test
+      ADMIN_USERNAME: testuser
+      ADMIN_PASSWORD: testpass
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
       - run: uv sync --dev
       - run: uv run playwright install chromium
+      - run: uv run alembic upgrade head
       - run: uv run pytest -v --cov=breakthevibe --cov-report=xml --cov-fail-under=55 -m "not integration"
       - run: uv run pytest -v -m integration
 
