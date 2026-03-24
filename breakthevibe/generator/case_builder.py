@@ -43,7 +43,16 @@ class TestCaseGenerator:
                 component_map[comp.name] = comp
 
         raw_cases = self._parse_response(response.content)
-        cases = [self._build_test_case(raw, component_map) for raw in raw_cases]
+        cases: list[GeneratedTestCase] = []
+        for raw in raw_cases:
+            try:
+                cases.append(self._build_test_case(raw, component_map))
+            except (KeyError, ValueError) as exc:
+                logger.warning(
+                    "skipping_malformed_test_case",
+                    error=str(exc),
+                    raw_case=str(raw)[:200],
+                )
 
         # Apply rules filtering
         cases = self._apply_rules(cases)
@@ -96,63 +105,154 @@ class TestCaseGenerator:
             inputs_desc = f"\n\nPredefined input values (use these for form fills):\n{inputs_lines}"
 
         return (
-            "Analyze the following website structure and generate test cases.\n"
+            "Analyze the following website structure and generate comprehensive test cases.\n"
             f"Site: {sitemap.base_url}\n\n"
             f"Pages:\n{chr(10).join(pages_desc)}\n\n"
             f"API Endpoints:\n{api_endpoints_desc}"
             f"{spec_only_desc}{inputs_desc}\n\n"
+            "VOLUME REQUIREMENT: Generate at least 2-3 test cases per discovered page/route.\n"
+            "Cover happy paths, edge cases, and API contracts for every route listed above.\n\n"
             "Generate test cases in these categories:\n"
-            "1. functional - Include these sub-types:\n"
+            "1. functional - category value must be exactly: functional\n"
             "   a. happy_path: Standard user journeys that should succeed\n"
             "   b. edge_case: Boundary values, empty inputs, special characters\n"
             "   c. cross_page: Multi-page flows using navigation links between routes\n"
             "   Use the 'Navigates to' data to build cross-page flows.\n"
-            "2. visual - Visual regression baseline captures for visually important components\n"
-            "3. api - API contract validation: check status codes AND validate response "
+            "2. visual - category value must be exactly: visual\n"
+            "   Visual regression baseline captures for visually important components\n"
+            "3. api - category value must be exactly: api\n"
+            "   API contract validation: check status codes AND validate response "
             "body structure (assert key fields exist and have correct types)\n\n"
+            "Valid selector strategies: css, xpath, text, role, test_id\n"
             "For fill actions, use the predefined input values when available.\n\n"
-            "Return JSON with this structure:\n"
+            "IMPORTANT for api_call steps: put the HTTP method inside the 'expected' object,\n"
+            "not at the top level of the step. Example:\n"
+            '  "expected": {"method": "GET", "status": 200}\n\n'
+            "Return a JSON object — no markdown, no explanation — with EXACTLY this structure:\n"
             "{\n"
             '  "test_cases": [\n'
             "    {\n"
-            '      "name": "test_descriptive_name",\n'
-            '      "category": "functional|visual|api",\n'
-            '      "description": "What this tests",\n'
-            '      "route": "/route",\n'
+            '      "name": "home_page_loads_successfully",\n'
+            '      "category": "functional",\n'
+            '      "description": "Verify the home page renders with the main heading",\n'
+            '      "route": "/",\n'
             '      "steps": [\n'
             "        {\n"
-            '          "action": "navigate|click|fill|assert_url|assert_text'
-            '|api_call|assert_status|assert_body|screenshot",\n'
-            '          "target_url": "optional url",\n'
-            '          "selectors": [{"strategy": "test_id|role|text|css",'
-            ' "value": "...", "name": "optional"}],\n'
-            '          "expected": "optional expected value or JSON schema object",\n'
-            '          "method": "optional HTTP method",\n'
-            '          "name": "optional screenshot name",\n'
-            '          "description": "step description"\n'
+            '          "action": "navigate",\n'
+            '          "target_url": "/",\n'
+            '          "selectors": [],\n'
+            '          "expected": null,\n'
+            '          "name": null,\n'
+            '          "description": "Navigate to home page"\n'
+            "        },\n"
+            "        {\n"
+            '          "action": "assert_text",\n'
+            '          "target_url": null,\n'
+            '          "selectors": [{"strategy": "role", "value": "heading", "name": "h1"}],\n'
+            '          "expected": "Welcome",\n'
+            '          "name": null,\n'
+            '          "description": "Assert main heading is visible"\n'
+            "        }\n"
+            "      ]\n"
+            "    },\n"
+            "    {\n"
+            '      "name": "api_get_users_returns_200",\n'
+            '      "category": "api",\n'
+            '      "description": "Verify GET /users returns 200 with a list",\n'
+            '      "route": "/users",\n'
+            '      "steps": [\n'
+            "        {\n"
+            '          "action": "api_call",\n'
+            '          "target_url": "/users",\n'
+            '          "selectors": [],\n'
+            '          "expected": {"method": "GET", "status": 200},\n'
+            '          "name": null,\n'
+            '          "description": "Call GET /users"\n'
             "        }\n"
             "      ]\n"
             "    }\n"
             "  ]\n"
-            "}"
+            "}\n\n"
+            "Now generate test cases for all pages and API endpoints listed above."
         )
 
     def _parse_response(self, content: str) -> list[dict[str, Any]]:
         """Parse LLM response JSON into raw test case dicts."""
-        # Strip markdown code fences if present
         cleaned = content.strip()
+        logger.debug("llm_raw_response", content_preview=cleaned[:500])
+
+        # Strip markdown code fences: ```json, ```yaml, ``` etc.
         if cleaned.startswith("```"):
-            lines = cleaned.split("\n")
-            # Remove first and last lines (``` markers)
-            lines = [line for line in lines if not line.strip().startswith("```")]
-            cleaned = "\n".join(lines)
+            lines = cleaned.splitlines()
+            # Drop opening fence line and any closing fence lines
+            lines = [line for line in lines[1:] if not line.strip().startswith("```")]
+            cleaned = "\n".join(lines).strip()
+
+        # Attempt 1: parse the cleaned string directly
         try:
             data = json.loads(cleaned)
+            cases: list[dict[str, Any]] = data.get("test_cases", [])
+            logger.debug("llm_response_parsed", case_count=len(cases))
+            return cases
         except json.JSONDecodeError:
-            logger.warning("llm_response_parse_error", content=content[:200])
-            return []
-        cases: list[dict[str, Any]] = data.get("test_cases", [])
-        return cases
+            pass
+
+        # Attempt 2: extract JSON object between first `{` and last `}`
+        obj_start = cleaned.find("{")
+        obj_end = cleaned.rfind("}")
+        if obj_start != -1 and obj_end != -1 and obj_end > obj_start:
+            try:
+                data = json.loads(cleaned[obj_start : obj_end + 1])
+                cases = data.get("test_cases", [])
+                if cases:
+                    logger.debug("llm_response_extracted_object", case_count=len(cases))
+                    return cases
+            except json.JSONDecodeError:
+                pass
+
+        # Attempt 3: extract JSON array between first `[` and last `]`
+        start = cleaned.find("[")
+        end = cleaned.rfind("]")
+        if start != -1 and end != -1 and end > start:
+            try:
+                cases = json.loads(cleaned[start : end + 1])
+                if isinstance(cases, list):
+                    logger.debug("llm_response_extracted_array", case_count=len(cases))
+                    return cases
+            except json.JSONDecodeError:
+                pass
+
+        # Attempt 4: repair truncated JSON — LLM may have hit max_tokens
+        # Find the last complete JSON object in a test_cases array
+        arr_start = cleaned.find("[")
+        if arr_start != -1:
+            # Find last complete `}` that could end a test case object
+            fragment = cleaned[arr_start:]
+            # Try progressively shorter substrings ending at each `}`
+            last_brace = fragment.rfind("}")
+            while last_brace > 0:
+                candidate = fragment[: last_brace + 1] + "]"
+                try:
+                    cases = json.loads(candidate)
+                    if isinstance(cases, list) and cases:
+                        logger.warning(
+                            "llm_response_repaired_truncated",
+                            original_length=len(content),
+                            recovered_cases=len(cases),
+                        )
+                        return cases
+                except json.JSONDecodeError:
+                    pass
+                last_brace = fragment.rfind("}", 0, last_brace)
+
+        logger.error(
+            "llm_response_parse_error",
+            content_preview=content[:500],
+            content_length=len(content),
+            hint="All JSON parse attempts failed including truncation repair. "
+            "Check if the LLM model supports structured JSON output.",
+        )
+        return []
 
     def _build_test_case(
         self, raw: dict[str, Any], component_map: dict[str, ComponentInfo] | None = None

@@ -36,39 +36,39 @@ class TestArtifactStore:
         assert "diffs" in str(path)
         assert path.name == "home.png"
 
-    def test_save_and_load_screenshot(self, store: ArtifactStore) -> None:
+    async def test_save_and_load_screenshot(self, store: ArtifactStore) -> None:
         data = b"\x89PNG fake screenshot data"
-        path = store.save_screenshot("proj-1", "run-1", "step_01", data)
+        path = await store.save_screenshot("proj-1", "run-1", "step_01", data)
         assert path.exists()
         assert path.read_bytes() == data
 
-    def test_list_screenshots(self, store: ArtifactStore) -> None:
-        store.save_screenshot("proj-1", "run-1", "step_01", b"img1")
-        store.save_screenshot("proj-1", "run-1", "step_02", b"img2")
+    async def test_list_screenshots(self, store: ArtifactStore) -> None:
+        await store.save_screenshot("proj-1", "run-1", "step_01", b"img1")
+        await store.save_screenshot("proj-1", "run-1", "step_02", b"img2")
         screenshots = store.list_screenshots("proj-1", "run-1")
         assert len(screenshots) == 2
 
-    def test_save_video(self, store: ArtifactStore) -> None:
+    async def test_save_video(self, store: ArtifactStore) -> None:
         data = b"fake video data"
-        path = store.save_video("proj-1", "run-1", "crawl", data)
+        path = await store.save_video("proj-1", "run-1", "crawl", data)
         assert path.exists()
         assert path.read_bytes() == data
 
-    def test_cleanup_run(self, store: ArtifactStore) -> None:
-        store.save_screenshot("proj-1", "run-1", "step_01", b"img")
-        store.save_video("proj-1", "run-1", "crawl", b"vid")
+    async def test_cleanup_run(self, store: ArtifactStore) -> None:
+        await store.save_screenshot("proj-1", "run-1", "step_01", b"img")
+        await store.save_video("proj-1", "run-1", "crawl", b"vid")
         run_dir = store.get_run_dir("proj-1", "run-1")
         assert any(run_dir.rglob("*"))
         store.cleanup_run("proj-1", "run-1")
         assert not run_dir.exists()
 
-    def test_cleanup_project(self, store: ArtifactStore) -> None:
-        store.save_screenshot("proj-1", "run-1", "step_01", b"img")
+    async def test_cleanup_project(self, store: ArtifactStore) -> None:
+        await store.save_screenshot("proj-1", "run-1", "step_01", b"img")
         store.cleanup_project("proj-1")
         artifacts_dir = store._base / "proj-1" / "artifacts"
         assert not artifacts_dir.exists()
 
-    def test_get_disk_usage(self, store: ArtifactStore) -> None:
-        store.save_screenshot("proj-1", "run-1", "step_01", b"x" * 1000)
+    async def test_get_disk_usage(self, store: ArtifactStore) -> None:
+        await store.save_screenshot("proj-1", "run-1", "step_01", b"x" * 1000)
         usage = store.get_disk_usage("proj-1")
         assert usage >= 1000

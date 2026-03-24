@@ -21,6 +21,9 @@ logger = structlog.get_logger(__name__)
 class CodeBuilder:
     """Generates pytest + Playwright code from GeneratedTestCase objects."""
 
+    def __init__(self, base_url: str = "") -> None:
+        self._base_url = base_url.rstrip("/")
+
     def generate(self, case: GeneratedTestCase) -> str:
         """Generate pytest code for a single test case."""
         if case.category == TestCategory.FUNCTIONAL:
@@ -115,11 +118,18 @@ class CodeBuilder:
         msg = f"Unknown category: {case.category}"
         raise ValueError(msg)
 
+    @staticmethod
+    def _test_name(name: str) -> str:
+        """Ensure function name starts with test_ for pytest collection."""
+        if not name.startswith("test_"):
+            return f"test_{name}"
+        return name
+
     def _functional_body(self, case: GeneratedTestCase) -> str:
         """Generate functional test function."""
         lines = [
             "@pytest.mark.asyncio",
-            f"async def {case.name}(page: Page) -> None:",
+            f"async def {self._test_name(case.name)}(page: Page) -> None:",
             f'    """{case.description}"""',
         ]
         for step in case.steps:
@@ -130,9 +140,9 @@ class CodeBuilder:
         """Generate API test function."""
         lines = [
             "@pytest.mark.asyncio",
-            f"async def {case.name}() -> None:",
+            f"async def {self._test_name(case.name)}() -> None:",
             f'    """{case.description}"""',
-            "    async with httpx.AsyncClient() as client:",
+            f'    async with httpx.AsyncClient(base_url="{self._base_url}") as client:',
         ]
         for step in case.steps:
             lines.extend(self._step_to_httpx(step))
@@ -142,7 +152,7 @@ class CodeBuilder:
         """Generate visual regression test function."""
         lines = [
             "@pytest.mark.asyncio",
-            f"async def {case.name}(page: Page, tmp_path: Path) -> None:",
+            f"async def {self._test_name(case.name)}(page: Page, tmp_path: Path) -> None:",
             f'    """{case.description}"""',
         ]
         for step in case.steps:
@@ -153,7 +163,10 @@ class CodeBuilder:
         """Convert a test step to Playwright code lines with selector fallback."""
         lines: list[str] = []
         if step.action == "navigate":
-            lines.append(f'    await page.goto("{step.target_url}")')
+            url = step.target_url or "/"
+            if url.startswith("/") and self._base_url:
+                url = f"{self._base_url}{url}"
+            lines.append(f'    await page.goto("{url}")')
         elif step.action == "click":
             lines.extend(self._build_fallback_locator(step.selectors, "click()"))
         elif step.action == "fill":
@@ -191,7 +204,10 @@ class CodeBuilder:
         """Convert a test step to visual regression code lines with diff comparison."""
         lines: list[str] = []
         if step.action == "navigate":
-            lines.append(f'    await page.goto("{step.target_url}")')
+            url = step.target_url or "/"
+            if url.startswith("/") and self._base_url:
+                url = f"{self._base_url}{url}"
+            lines.append(f'    await page.goto("{url}")')
         elif step.action == "screenshot":
             name = step.expected or "screenshot"
             lines.append(f'    current = tmp_path / "{name}.png"')
@@ -200,34 +216,73 @@ class CodeBuilder:
             lines.append("    if baseline.exists():")
             lines.append(f'        diff_path = tmp_path / "{name}_diff.png"')
             lines.append("        diff = VisualDiff().compare(baseline, current, diff_path)")
+            # Write diff result to capture JSON for pipeline visibility
+            lines.append("        import json as _json")
+            lines.append('        _captures_dir = Path.cwd() / f"{request.node.name}_captures"')
+            lines.append("        if _captures_dir.exists():")
+            lines.append(
+                '            _diff_file = _captures_dir / f"{request.node.name}_diff.json"'
+            )
+            lines.append("            _diff_file.write_text(_json.dumps({")
+            lines.append('                "matches": diff.matches,')
+            lines.append('                "diff_percentage": diff.diff_percentage,')
+            lines.append(
+                '                "diff_image_path": '
+                "str(diff.diff_image_path) if diff.diff_image_path else None,"
+            )
+            lines.append('                "size_mismatch": diff.size_mismatch,')
+            lines.append('                "different_pixels": diff.different_pixels,')
+            lines.append('                "total_pixels": diff.total_pixels,')
+            lines.append("            }))")
             lines.append("        assert diff.matches, (")
             lines.append('            f"Visual regression: {diff.diff_percentage:.2%} changed"')
             lines.append("        )")
         return lines
 
     def _build_fallback_locator(self, selectors: list[ResilientSelector], action: str) -> list[str]:
-        """Build selector fallback chain: try each in priority order."""
+        """Build selector fallback chain: try each in priority order with heal tracking."""
         if not selectors or len(selectors) <= 1:
             locator = self._build_locator(selectors)
             return [f"    await {locator}.{action}"]
 
         # Generate try/except chain for resilient selector fallback
+        # When a fallback selector succeeds, write heal info to capture JSON
+        original = selectors[0]
+        original_desc = f"{original.strategy.value}:{original.value}"
         lines: list[str] = []
         for i, sel in enumerate(selectors):
             locator_str = self._single_locator(sel)
+            sel_desc = f"{sel.strategy.value}:{sel.value}"
             if i == 0:
                 lines.append("    try:")
                 lines.append(f"        locator = {locator_str}")
                 lines.append("        if await locator.count() > 0:")
                 lines.append(f"            await locator.{action}")
+                lines.append("        else:")
+                lines.append("            raise Exception('No elements found')")
             elif i == len(selectors) - 1:
                 lines.append("    except Exception:")
                 lines.append(f"        await {locator_str}.{action}")
+                lines.append(f"        # Selector healed: fell back from {original_desc}")
+                lines.append(self._heal_capture_line(original_desc, sel_desc))
             else:
                 lines.append("    except Exception:")
                 lines.append("        try:")
                 lines.append(f"            await {locator_str}.{action}")
+                lines.append(f"            # Selector healed: fell back from {original_desc}")
+                lines.append(self._heal_capture_line(original_desc, sel_desc))
         return lines
+
+    @staticmethod
+    def _heal_capture_line(original: str, used: str) -> str:
+        """Generate a line that writes heal info to the capture JSON."""
+        return (
+            f"        import json as _hj; "
+            f"__import__('pathlib').Path.cwd().joinpath('_heal_log.jsonl')"
+            f".open('a').write(_hj.dumps("
+            f'{{"original": "{original}", "used": "{used}"}}'
+            f") + '\\n')"
+        )
 
     def _build_locator(self, selectors: list[ResilientSelector]) -> str:
         """Build a Playwright locator from selectors, using highest priority."""

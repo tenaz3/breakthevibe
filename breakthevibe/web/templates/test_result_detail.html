@@ -101,21 +101,113 @@
 
 <!-- Step Replay -->
 <div class="card mb-6" id="replay-panel">
-    <div class="card-header">
-        <h3>Step Replay</h3>
-    </div>
-    <div class="card-content">
-        <div class="replay-controls mb-3">
-            <button type="button" class="btn btn-secondary btn-sm" id="replay-prev">Previous</button>
-            <span id="replay-counter" class="text-[0.75rem] text-muted-foreground tabular-nums">0 / 0</span>
-            <button type="button" class="btn btn-secondary btn-sm" id="replay-next">Next</button>
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+        <h3 style="margin:0">Step Inspector</h3>
+        <div class="replay-controls" style="display:flex;align-items:center;gap:0.5rem">
+            <button type="button" class="btn btn-secondary btn-sm" id="replay-prev" style="padding:0.25rem 0.75rem">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <span id="replay-counter" class="text-[0.75rem] text-muted-foreground tabular-nums" style="min-width:3rem;text-align:center">0 / 0</span>
+            <button type="button" class="btn btn-secondary btn-sm" id="replay-next" style="padding:0.25rem 0.75rem">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </button>
         </div>
-        <div id="replay-step-info" class="text-[0.8125rem] text-foreground"></div>
-        <img id="replay-screenshot" class="replay-screenshot mt-3 hidden" src="" alt="Step screenshot">
-        <div id="replay-network" class="mt-2 text-[0.75rem] text-muted-foreground"></div>
-        <pre id="replay-console" class="code-block mt-2 text-[0.75rem] hidden"></pre>
+    </div>
+    <div class="card-content" style="padding:0">
+        <!-- Step title bar -->
+        <div id="replay-step-info" style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.5rem"></div>
+
+        <!-- Screenshot panel -->
+        <img id="replay-screenshot" class="hidden" src="" alt="Step screenshot"
+             style="width:100%;max-height:400px;object-fit:contain;background:var(--muted);border-bottom:1px solid var(--border)">
+
+        <!-- Network tree -->
+        <div id="replay-network" style="padding:0.75rem 1rem;border-bottom:1px solid var(--border)"></div>
+
+        <!-- Console output -->
+        <div id="replay-console" style="padding:0.75rem 1rem;display:none"></div>
     </div>
 </div>
+
+<style>
+/* Step Inspector styles */
+.step-badge {
+    display:inline-flex;align-items:center;padding:0.125rem 0.5rem;
+    border-radius:9999px;font-size:0.6875rem;font-weight:600;
+    background:var(--primary);color:white;letter-spacing:0.02em;
+}
+.step-title {
+    font-weight:600;font-size:0.875rem;color:var(--foreground);
+}
+
+/* Network tree */
+.net-header {
+    font-size:0.6875rem;font-weight:600;text-transform:uppercase;
+    letter-spacing:0.05em;color:var(--muted-foreground);margin-bottom:0.5rem;
+}
+.net-empty {
+    font-size:0.8125rem;color:var(--muted-foreground);font-style:italic;
+}
+.net-group {
+    margin-bottom:0.25rem;
+}
+.net-group > summary {
+    cursor:pointer;list-style:none;display:flex;align-items:center;gap:0.5rem;
+    padding:0.25rem 0;font-size:0.75rem;font-weight:600;color:var(--foreground);
+}
+.net-group > summary::-webkit-details-marker { display:none; }
+.net-group > summary::before {
+    content:"";display:inline-block;width:0;height:0;
+    border-left:4px solid var(--muted-foreground);border-top:3px solid transparent;border-bottom:3px solid transparent;
+    transition:transform 0.15s ease;
+}
+.net-group[open] > summary::before { transform:rotate(90deg); }
+.net-count {
+    font-size:0.625rem;background:var(--muted);color:var(--muted-foreground);
+    padding:0.0625rem 0.375rem;border-radius:9999px;font-weight:500;
+}
+.net-row {
+    display:grid;grid-template-columns:3.5rem 1fr 2.5rem;gap:0.5rem;
+    align-items:center;padding:0.1875rem 0 0.1875rem 1rem;
+    font-size:0.75rem;font-family:var(--font-mono, 'JetBrains Mono', monospace);
+    border-left:1px solid var(--border);margin-left:0.375rem;
+}
+.net-method {
+    font-size:0.625rem;font-weight:700;letter-spacing:0.03em;
+    padding:0.0625rem 0.25rem;border-radius:3px;text-align:center;
+}
+.method-get { color:#2563eb;background:#dbeafe; }
+.method-post { color:#16a34a;background:#dcfce7; }
+.method-put { color:#d97706;background:#fef3c7; }
+.method-del { color:#dc2626;background:#fee2e2; }
+.dark .method-get { color:#93c5fd;background:#1e3a5f; }
+.dark .method-post { color:#86efac;background:#14532d; }
+.dark .method-put { color:#fcd34d;background:#451a03; }
+.dark .method-del { color:#fca5a5;background:#450a0a; }
+.net-path {
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    color:var(--foreground);
+}
+.net-status {
+    font-size:0.6875rem;font-weight:600;text-align:right;
+}
+.net-status-ok { color:#16a34a; }
+.net-status-redirect { color:#2563eb; }
+.net-status-client-err { color:#dc2626; }
+.net-status-server-err { color:#dc2626;font-weight:800; }
+.net-status-pending { color:var(--muted-foreground); }
+
+/* Console lines */
+.console-line {
+    font-family:var(--font-mono, 'JetBrains Mono', monospace);
+    font-size:0.75rem;padding:0.125rem 0;
+}
+.console-error { color:#dc2626; }
+.console-warn { color:#d97706; }
+.console-log { color:var(--muted-foreground); }
+.dark .console-error { color:#fca5a5; }
+.dark .console-warn { color:#fcd34d; }
+</style>
 
 <!-- Visual diffs -->
 {% if diffs %}
@@ -148,7 +240,7 @@
 
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/replay.js"></script>
+<script src="/static/js/replay.js?v=2"></script>
 <script>
     window.__replaySteps = {{ replay_steps_json|safe }};
     if (typeof window.loadReplaySteps === 'function') {

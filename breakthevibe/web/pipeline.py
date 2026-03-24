@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -117,24 +118,26 @@ async def build_pipeline(
         if provider == "ollama" and ollama_url:
             return create_llm_provider("ollama", base_url=ollama_url, model=model)
 
-        # Log when explicit provider was set but key is missing
+        # Log when explicit provider was set but key is missing — fall back to
+        # any available provider rather than silently returning None.
         if provider:
             logger.warning(
-                "llm_provider_key_missing",
+                "llm_provider_key_missing_falling_back",
                 provider=provider,
                 module=module_name,
             )
 
-        # Auto-detect fallback (no explicit provider set)
-        if not provider:
-            if api_key:
-                return create_llm_provider("anthropic", api_key=api_key, model=model)
-            if openai_key:
-                return create_llm_provider("openai", api_key=openai_key, model=model)
-            if google_key:
-                return create_llm_provider("gemini", api_key=google_key, model=model)
-            if ollama_url:
-                return create_llm_provider("ollama", base_url=ollama_url, model=model)
+        # Auto-detect fallback: try every available key in priority order.
+        # Reached when no explicit provider is set OR when the explicit
+        # provider's key is missing (mismatch recovery).
+        if api_key:
+            return create_llm_provider("anthropic", api_key=api_key, model=None)
+        if openai_key:
+            return create_llm_provider("openai", api_key=openai_key, model=None)
+        if google_key:
+            return create_llm_provider("gemini", api_key=google_key, model=None)
+        if ollama_url:
+            return create_llm_provider("ollama", base_url=ollama_url, model=None)
         return None
 
     # Create per-module LLM instances (with fallback to a shared default)
@@ -155,7 +158,7 @@ async def build_pipeline(
     )
 
     mapper = MindMapBuilder(classifier=classifier)
-    code_builder = CodeBuilder()
+    code_builder = CodeBuilder(base_url=url)
     generator = TestCaseGenerator(llm=llm, rules=rules) if llm else None
 
     # Runner — test output dir under the run's artifact directory
@@ -184,3 +187,35 @@ async def build_pipeline(
 
     logger.info("pipeline_built", project_id=project_id, has_llm=llm is not None)
     return orchestrator
+
+
+async def _create_llm_for_rules(org_id: str = "") -> Any:
+    """Create an LLM instance for rule generation (reuses pipeline LLM resolution)."""
+    settings = get_settings()
+    from breakthevibe.web.dependencies import llm_settings_repo
+
+    llm_settings: dict[str, Any] = {}
+    with contextlib.suppress(OSError, ValueError, KeyError):
+        llm_settings = (
+            await llm_settings_repo.get_all(org_id=org_id)
+            if org_id
+            else await llm_settings_repo.get_all()
+        )
+
+    # Check DB keys then env vars
+    _raw_anthropic = llm_settings.get("anthropic_api_key")
+    _raw_openai = llm_settings.get("openai_api_key")
+    _raw_google = llm_settings.get("google_api_key")
+    api_key = (
+        decrypt_value(_raw_anthropic) if _raw_anthropic else None
+    ) or settings.anthropic_api_key
+    openai_key = (decrypt_value(_raw_openai) if _raw_openai else None) or settings.openai_api_key
+    google_key = (decrypt_value(_raw_google) if _raw_google else None) or settings.google_api_key
+
+    if api_key:
+        return create_llm_provider("anthropic", api_key=api_key)
+    if openai_key:
+        return create_llm_provider("openai", api_key=openai_key)
+    if google_key:
+        return create_llm_provider("gemini", api_key=google_key)
+    return None

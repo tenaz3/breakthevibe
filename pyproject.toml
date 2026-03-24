@@ -25,6 +25,7 @@ dependencies = [
     "google-genai>=1.65.0",
     "webauthn>=2.2.0",
     "cryptography>=46.0.5",
+    "pytest-rerunfailures>=16.1",
 ]
 
 [dependency-groups]

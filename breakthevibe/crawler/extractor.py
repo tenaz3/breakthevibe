@@ -2,7 +2,6 @@
 
 from typing import Any
 
-from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Page
 
 from breakthevibe.models.domain import ComponentInfo, InteractionInfo, ResilientSelector
@@ -67,10 +66,15 @@ class ComponentExtractor:
     async def extract_components(self, page: Page) -> list[ComponentInfo]:
         """Extract all meaningful components via DOM analysis + accessibility snapshot (#15)."""
         # Playwright accessibility tree for richer semantic structure
+        # page.accessibility.snapshot() was removed in Playwright 1.49+;
+        # use page.locator("body").aria_snapshot() or fall back gracefully.
+        self._a11y_snapshot = None
         try:
-            self._a11y_snapshot = await page.accessibility.snapshot()  # type: ignore[attr-defined]
-        except (PlaywrightError, AttributeError):
-            self._a11y_snapshot = None
+            snapshot_text = await page.locator("body").aria_snapshot()
+            # aria_snapshot returns a YAML-like string; wrap it as a simple dict
+            self._a11y_snapshot = {"role": "document", "name": "", "raw": snapshot_text}
+        except Exception:  # noqa: BLE001
+            pass
 
         raw_elements: list[dict[str, Any]] = await page.evaluate(EXTRACT_JS)
 

@@ -143,8 +143,25 @@ async def run_pipeline(
                     active_stages=active_stages,
                 )
 
+                logger.info(
+                    "pipeline_stages_summary",
+                    project_id=project_id,
+                    requested_stages=[s.value for s in active_stages],
+                    completed_stages=[s.value for s in result.completed_stages],
+                    failed_stage=(result.failed_stage.value if result.failed_stage else None),
+                )
+
                 # Build rich result data including report details
                 report = result.report
+                logger.info(
+                    "pipeline_report_check",
+                    project_id=project_id,
+                    report_exists=report is not None,
+                    overall_status=(report.overall_status.value if report else None),
+                    total_suites=(report.total_suites if report else 0),
+                    passed_suites=(report.passed_suites if report else 0),
+                    failed_suites=(report.failed_suites if report else 0),
+                )
                 result_data: dict[str, Any] = {
                     "run_id": result.run_id,
                     "success": result.success,
@@ -152,6 +169,7 @@ async def run_pipeline(
                     "failed_stage": (result.failed_stage.value if result.failed_stage else None),
                     "error_message": result.error_message,
                     "duration_seconds": result.duration_seconds,
+                    "warnings": result.warnings,
                 }
                 if report:
                     result_data["total"] = report.total_suites
@@ -159,6 +177,7 @@ async def run_pipeline(
                     result_data["failed"] = report.failed_suites
                     result_data["status"] = report.overall_status.value
                     result_data["heal_warnings"] = report.heal_warnings
+                    result_data["diffs"] = report.diffs
                     result_data["suites"] = [
                         {
                             "name": r.suite_name,
@@ -171,6 +190,8 @@ async def run_pipeline(
                                     "screenshot_path": sc.screenshot_path,
                                     "network_calls": sc.network_calls,
                                     "console_logs": sc.console_logs,
+                                    "diff_result": sc.diff_result,
+                                    "heal_info": sc.heal_info,
                                 }
                                 for sc in r.step_captures
                             ],
@@ -178,20 +199,26 @@ async def run_pipeline(
                         for r in report.results
                     ]
 
-                # Persist to DB
-                try:
-                    await test_run_repo.save_pipeline_result(
-                        project_id=pid,
-                        org_id=org_id,
-                        result_data=result_data,
-                    )
-                except (ValueError, TypeError, OSError) as persist_err:
-                    logger.warning("test_run_persist_failed", error=str(persist_err))
+                # Persist to DB — only save a TestRun when tests actually executed
+                # (skip for generate-only runs that produce no report)
+                if report:
+                    try:
+                        await test_run_repo.save_pipeline_result(
+                            project_id=pid,
+                            org_id=org_id,
+                            result_data=result_data,
+                        )
+                    except (ValueError, TypeError, OSError) as persist_err:
+                        logger.warning("test_run_persist_failed", error=str(persist_err))
 
-                status = "completed" if result.success else "failed"
-                await project_repo.update(
-                    project_id, org_id=org_id, status=status, last_run_id=result.run_id
-                )
+                if report:
+                    status = "completed" if result.success else "failed"
+                    await project_repo.update(
+                        project_id, org_id=org_id, status=status, last_run_id=result.run_id
+                    )
+                else:
+                    # Generate-only run — mark as ready, not completed
+                    await project_repo.update(project_id, org_id=org_id, status="ready")
                 logger.info(
                     "pipeline_background_done",
                     project_id=project_id,

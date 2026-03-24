@@ -234,7 +234,7 @@ class Crawler:
         if self._artifacts and self._project_id and self._run_id:
             step_name = navigator.get_path(url).replace("/", "_").strip("_") or "index"
             ss_data = await extractor.take_screenshot(page, "")
-            saved = self._artifacts.save_screenshot(
+            saved = await self._artifacts.save_screenshot(
                 self._project_id, self._run_id, step_name, ss_data
             )
             screenshot_path = str(saved)
@@ -364,7 +364,7 @@ class Crawler:
                         if self._artifacts and self._project_id and self._run_id and extractor:
                             try:
                                 ss_data = await extractor.take_screenshot(page, "")
-                                self._artifacts.save_screenshot(
+                                await self._artifacts.save_screenshot(
                                     self._project_id,
                                     self._run_id,
                                     f"before_click_{click_index}",
@@ -386,7 +386,7 @@ class Crawler:
                         if self._artifacts and self._project_id and self._run_id and extractor:
                             try:
                                 ss_data = await extractor.take_screenshot(page, "")
-                                self._artifacts.save_screenshot(
+                                await self._artifacts.save_screenshot(
                                     self._project_id,
                                     self._run_id,
                                     f"after_click_{click_index}",

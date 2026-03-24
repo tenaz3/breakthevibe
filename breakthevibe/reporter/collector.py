@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -36,6 +36,7 @@ class TestRunReport:
     results: list[ExecutionResult]
     heal_warnings: list[str] = field(default_factory=list)
     screenshots: list[ScreenshotRef] = field(default_factory=list)
+    diffs: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def total_suites(self) -> int:
@@ -52,7 +53,7 @@ class TestRunReport:
     @property
     def overall_status(self) -> TestStatus:
         if not self.results:
-            return TestStatus.PASSED
+            return TestStatus.SKIPPED
         return TestStatus.PASSED if all(r.success for r in self.results) else TestStatus.FAILED
 
     @property
@@ -97,12 +98,28 @@ class ResultCollector:
 
     def build_report(self, project_id: str, run_id: str) -> TestRunReport:
         """Build a complete test run report."""
+        # Collect diffs and heal info from step captures across all results
+        diffs: list[dict[str, Any]] = []
+        for result in self._results:
+            for capture in result.step_captures:
+                if capture.diff_result:
+                    diffs.append(
+                        {"step": capture.name, "suite": result.suite_name, **capture.diff_result}
+                    )
+                if capture.heal_info:
+                    msg = (
+                        f"Selector healed in {result.suite_name}/{capture.name}: "
+                        f"fell back from {capture.heal_info.get('original', '?')} "
+                        f"to {capture.heal_info.get('used', '?')}"
+                    )
+                    self._heal_warnings.append(msg)
         report = TestRunReport(
             project_id=project_id,
             run_id=run_id,
             results=list(self._results),
             heal_warnings=list(self._heal_warnings),
             screenshots=list(self._screenshots),
+            diffs=diffs,
         )
         logger.info(
             "report_built",

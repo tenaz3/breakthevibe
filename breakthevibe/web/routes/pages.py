@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
+from breakthevibe.config.settings import get_settings
 from breakthevibe.web.auth.rbac import get_tenant
 from breakthevibe.web.dependencies import project_repo, test_run_repo
 from breakthevibe.web.template_engine import templates
@@ -60,7 +62,29 @@ async def project_detail_page(
             },
             status_code=404,
         )
-    return templates.TemplateResponse(request, "project_detail.html", {"project": project})
+    from breakthevibe.config.settings import get_settings
+    from breakthevibe.web.dependencies import llm_settings_repo
+
+    settings = get_settings()
+
+    # Check both env vars and DB-stored keys
+    llm_configured = settings.llm_configured
+    if not llm_configured:
+        try:
+            db_settings = await llm_settings_repo.get_all(org_id=tenant.org_id)
+            llm_configured = bool(
+                db_settings.get("anthropic_api_key")
+                or db_settings.get("openai_api_key")
+                or db_settings.get("google_api_key")
+            )
+        except (OSError, ValueError, KeyError):
+            pass
+
+    return templates.TemplateResponse(
+        request,
+        "project_detail.html",
+        {"project": project, "llm_configured": llm_configured},
+    )
 
 
 @router.get("/projects/{project_id}/sitemap", response_class=HTMLResponse)
@@ -193,13 +217,27 @@ async def test_result_detail_page(
     duration = f"{result.get('duration_seconds', 0):.1f}s"
     heal_warnings = result.get("heal_warnings", [])
 
+    # Convert absolute screenshot paths to served URLs
+    settings = get_settings()
+    artifacts_base = str(Path(settings.artifacts_dir).expanduser().resolve())
+
+    def _to_served_url(abs_path: str, pid: str) -> str:
+        """Convert /home/.breakthevibe/projects/1/foo.png -> /artifacts/1/foo.png."""
+        if not abs_path:
+            return ""
+        project_prefix = f"{artifacts_base}/{pid}/"
+        if abs_path.startswith(project_prefix):
+            return f"/artifacts/{pid}/{abs_path[len(project_prefix) :]}"
+        return ""
+
+    pid = str(result.get("project_id", ""))
     replay_steps = []
     for suite in suites:
         for step in suite.get("step_captures", []):
             replay_steps.append(
                 {
                     "name": step.get("name", ""),
-                    "screenshot_url": step.get("screenshot_path", ""),
+                    "screenshot_url": _to_served_url(step.get("screenshot_path", ""), pid),
                     "network_requests": step.get("network_calls", []),
                     "console_logs": step.get("console_logs", []),
                 }

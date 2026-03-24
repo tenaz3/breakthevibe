@@ -110,7 +110,7 @@ class TestResultCollector:
     def test_empty_report(self, collector: ResultCollector) -> None:
         report = collector.build_report(project_id="proj-1", run_id="run-6")
         assert report.total_suites == 0
-        assert report.overall_status == TestStatus.PASSED
+        assert report.overall_status == TestStatus.SKIPPED
 
     def test_duration_sums(
         self,

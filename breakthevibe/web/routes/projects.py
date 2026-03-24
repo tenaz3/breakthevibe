@@ -99,6 +99,11 @@ async def delete_project(
     deleted = await project_repo.delete(project_id, org_id=tenant.org_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Project not found")
+    # Clean up artifact files on disk
+    from breakthevibe.storage.artifacts import ArtifactStore
+
+    artifact_store = ArtifactStore(org_id=tenant.org_id)
+    artifact_store.cleanup_project(project_id)
     await audit(
         org_id=tenant.org_id,
         user_id=tenant.user_id,

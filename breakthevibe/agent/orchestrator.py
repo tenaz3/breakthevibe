@@ -45,6 +45,7 @@ class PipelineResult:
     duration_seconds: float = 0.0
     report: Any = None  # TestRunReport from ResultCollector
     sitemap: Any = None  # SiteMap from MindMapBuilder
+    warnings: list[str] = field(default_factory=list)
 
 
 class PipelineOrchestrator:
@@ -208,19 +209,22 @@ class PipelineOrchestrator:
                         duration_seconds=duration,
                         report=context.get("report"),
                         sitemap=context.get("sitemap"),
+                        warnings=context.get("pipeline_warnings", []),
                     )
 
             self._emit("", "done")
             duration = time.monotonic() - start
             logger.info("pipeline_completed", run_id=run_id, duration=duration)
+            pipeline_warnings = context.get("pipeline_warnings", [])
             return PipelineResult(
                 project_id=project_id,
                 run_id=run_id,
-                success=True,
+                success=not pipeline_warnings,
                 completed_stages=completed,
                 duration_seconds=duration,
                 report=context.get("report"),
                 sitemap=context.get("sitemap"),
+                warnings=pipeline_warnings,
             )
         finally:
             unbind_contextvars("pipeline_run_id", "pipeline_project_id")
@@ -270,10 +274,22 @@ class PipelineOrchestrator:
 
     async def _run_generate(self, context: dict[str, Any]) -> None:
         if not self._generator:
-            logger.warning("no_generator_available", reason="no LLM provider configured")
-            context["test_cases"] = []
-            return
+            raise RuntimeError(
+                "No LLM provider configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, "
+                "GOOGLE_API_KEY, or ensure Ollama is running to generate tests."
+            )
         cases = await self._generator.generate(context.get("sitemap"))
+        logger.info("generate_produced", test_case_count=len(cases))
+        if not cases:
+            logger.error(
+                "generate_returned_empty_cases",
+                project_id=context.get("project_id"),
+                hint="LLM returned no parseable test cases. Check LLM config, API key, and model.",
+            )
+            context["generate_warning"] = (
+                "No test cases generated — the LLM response could not be parsed into "
+                "valid test cases. Check your LLM configuration and API key."
+            )
         # Generate executable code for each test case
         if self._code_builder:
             for case in cases:
@@ -283,8 +299,21 @@ class PipelineOrchestrator:
     async def _run_tests(self, context: dict[str, Any]) -> None:
         cases = context.get("test_cases", [])
         if not cases:
-            logger.info("no_test_cases_to_run")
+            warning = context.get("generate_warning", "")
+            logger.error(
+                "no_test_cases_to_run",
+                project_id=context.get("project_id"),
+                generate_warning=warning,
+                hint="Generate stage produced 0 test cases — skipping test execution.",
+            )
             context["test_results"] = []
+            context.setdefault(
+                "pipeline_warnings",
+                [],
+            ).append(
+                warning
+                or "Generate stage produced 0 test cases. Check LLM configuration and rules."
+            )
             return
 
         if not self._runner:
@@ -307,6 +336,20 @@ class PipelineOrchestrator:
                         workers=suite.workers,
                     )
                     results.append(result)
+                    logger.info(
+                        "suite_execution_result",
+                        suite=suite.name,
+                        success=result.success,
+                        exit_code=result.exit_code,
+                        duration=result.duration_seconds,
+                    )
+                    if not result.success:
+                        logger.warning(
+                            "suite_failed",
+                            suite=suite.name,
+                            exit_code=result.exit_code,
+                            timed_out=result.timed_out,
+                        )
                     if self._collector:
                         self._collector.add_execution_result(result)
             context["test_results"] = results
@@ -315,6 +358,20 @@ class PipelineOrchestrator:
             suite_code = self._code_builder.generate_suite(cases)
             if suite_code:
                 result = await self._runner.run(suite_name="all", test_code=suite_code)
+                logger.info(
+                    "suite_execution_result",
+                    suite="all",
+                    success=result.success,
+                    exit_code=result.exit_code,
+                    duration=result.duration_seconds,
+                )
+                if not result.success:
+                    logger.warning(
+                        "suite_failed",
+                        suite="all",
+                        exit_code=result.exit_code,
+                        timed_out=result.timed_out,
+                    )
                 if self._collector:
                     self._collector.add_execution_result(result)
                 context["test_results"] = [result]
@@ -329,3 +386,13 @@ class PipelineOrchestrator:
                 run_id=context.get("run_id", "auto"),
             )
             context["report"] = report
+            if report:
+                logger.info(
+                    "report_summary",
+                    total_suites=report.total_suites,
+                    passed_suites=report.passed_suites,
+                    failed_suites=report.failed_suites,
+                    overall_status=report.overall_status.value,
+                )
+            else:
+                logger.warning("report_is_none", project_id=context.get("project_id"))

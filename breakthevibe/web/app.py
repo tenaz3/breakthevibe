@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -47,7 +48,23 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         await user_repo.ensure_sentinel_org()
         logger.info("passkey_bootstrap_ready", msg="sentinel org ensured")
+
+    # Background task: clean expired sessions every hour
+    async def _session_cleanup_loop() -> None:
+        from breakthevibe.web.auth.session import SessionAuth
+
+        while True:
+            await asyncio.sleep(3600)
+            try:
+                deleted = await SessionAuth.cleanup_expired()
+                if deleted:
+                    logger.info("session_cleanup", deleted=deleted)
+            except Exception:
+                logger.exception("session_cleanup_failed")
+
+    cleanup_task = asyncio.create_task(_session_cleanup_loop())
     yield
+    cleanup_task.cancel()
     logger.info("app_shutdown")
 
 
@@ -61,6 +78,7 @@ def create_app() -> FastAPI:
         description="AI-powered QA automation platform",
         version="0.1.0",
         lifespan=_lifespan,
+        redirect_slashes=True,
     )
 
     # Redirect 401s to /login for browser page requests; return JSON for API

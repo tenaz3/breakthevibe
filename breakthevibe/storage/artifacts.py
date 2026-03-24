@@ -81,18 +81,32 @@ class ArtifactStore:
         diffs_dir.mkdir(parents=True, exist_ok=True)
         return diffs_dir / f"{diff_name}.png"
 
-    def save_screenshot(self, project_id: str, run_id: str, step_name: str, data: bytes) -> Path:
-        """Save screenshot data to file."""
+    async def save_screenshot(
+        self, project_id: str, run_id: str, step_name: str, data: bytes
+    ) -> Path:
+        """Save screenshot data to file and optionally to ObjectStore."""
         path = self.screenshot_path(project_id, run_id, step_name)
         path.write_bytes(data)
         logger.debug("screenshot_saved", path=str(path), size=len(data))
+        if self._store:
+            key = f"{_tenant_prefix(self._org_id, project_id)}/{run_id}/screenshots/{step_name}.png"
+            try:
+                await self._store.put(key, data)
+            except Exception:
+                logger.warning("screenshot_s3_upload_failed", key=key)
         return path
 
-    def save_video(self, project_id: str, run_id: str, video_name: str, data: bytes) -> Path:
-        """Save video data to file."""
+    async def save_video(self, project_id: str, run_id: str, video_name: str, data: bytes) -> Path:
+        """Save video data to file and optionally to ObjectStore."""
         path = self.video_path(project_id, run_id, video_name)
         path.write_bytes(data)
         logger.debug("video_saved", path=str(path), size=len(data))
+        if self._store:
+            key = f"{_tenant_prefix(self._org_id, project_id)}/{run_id}/videos/{video_name}.webm"
+            try:
+                await self._store.put(key, data)
+            except Exception:
+                logger.warning("video_s3_upload_failed", key=key)
         return path
 
     def list_screenshots(self, project_id: str, run_id: str) -> list[Path]:
