@@ -83,7 +83,13 @@ async def serve_artifact(
     rest_of_path: str,
     tenant: TenantContext = Depends(get_tenant),
 ) -> FileResponse:
-    """Serve artifact files (screenshots, videos) with path traversal protection."""
+    """Serve artifact files (screenshots, videos) with tenant + path traversal protection."""
+    # Verify project belongs to tenant
+    from breakthevibe.web.dependencies import project_repo
+
+    project = await project_repo.get(project_id, org_id=tenant.org_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Artifact not found")
     settings = get_settings()
     base = Path(settings.artifacts_dir).expanduser().resolve()
     file_path = (base / project_id / rest_of_path).resolve()

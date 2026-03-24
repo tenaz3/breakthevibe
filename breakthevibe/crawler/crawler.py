@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import fnmatch
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
@@ -376,8 +377,6 @@ class Crawler:
             # Check URL pattern match (empty patterns = match any page)
             url_patterns = blocker.get("url_patterns", [])
             if url_patterns:
-                import fnmatch
-
                 matched = any(fnmatch.fnmatch(current_url, p) for p in url_patterns)
                 if not matched:
                     continue

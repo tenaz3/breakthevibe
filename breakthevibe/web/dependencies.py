@@ -73,6 +73,7 @@ async def run_pipeline(
     stages: list[PipelineStage] | None = None,
     request_id: str | None = None,
     force_regenerate: bool = False,
+    cached_test_cases: list[Any] | None = None,
 ) -> None:
     """Run a (possibly partial) pipeline as a background task.
 
@@ -134,7 +135,15 @@ async def run_pipeline(
             try:
                 # Cache check: skip CRAWL/MAP/GENERATE if cached tests are valid
                 pre_context: dict[str, Any] | None = None
-                if not force_regenerate and PipelineStage.RUN in active_stages:
+                # Explicit cached cases from run-cached endpoint
+                if cached_test_cases:
+                    pre_context = {"test_cases": cached_test_cases}
+                    logger.info(
+                        "using_explicit_cached_cases",
+                        project_id=project_id,
+                        count=len(cached_test_cases),
+                    )
+                elif not force_regenerate and PipelineStage.RUN in active_stages:
                     cache_meta = await test_case_repo.get_cache_meta(pid, org_id)
                     if cache_meta:
                         latest_crawl = await crawl_run_repo.get_latest_for_project(pid, org_id)

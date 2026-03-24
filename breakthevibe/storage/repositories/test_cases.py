@@ -129,13 +129,19 @@ class TestCaseRepository:
             if not latest:
                 return None
 
-            # Count total
-            count_stmt = select(TestCase).where(
-                col(TestCase.project_id) == project_id,
-                col(TestCase.org_id) == org_id,
+            # Count total (efficient — no row loading)
+            from sqlalchemy import func
+
+            count_stmt = (
+                select(func.count())
+                .select_from(TestCase)
+                .where(
+                    col(TestCase.project_id) == project_id,
+                    col(TestCase.org_id) == org_id,
+                )
             )
             count_result = await session.execute(count_stmt)
-            count = len(count_result.scalars().all())
+            count = count_result.scalar() or 0
 
             return {
                 "sitemap_hash": latest.sitemap_hash,

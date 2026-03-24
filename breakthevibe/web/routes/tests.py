@@ -128,6 +128,11 @@ async def trigger_run_cached(
             detail="No cached test cases. Run a full pipeline first.",
         )
 
+    # Load cached cases explicitly so run_pipeline doesn't depend on crawl state
+    cached_cases = await test_case_repo.load_for_project(pid, org_id=tenant.org_id)
+    if not cached_cases:
+        raise HTTPException(status_code=409, detail="Cached test cases are empty.")
+
     background_tasks.add_task(
         run_pipeline,
         project_id=project_id,
@@ -136,6 +141,7 @@ async def trigger_run_cached(
         org_id=tenant.org_id,
         stages=[PipelineStage.RUN, PipelineStage.REPORT],
         request_id=request.headers.get("x-request-id"),
+        cached_test_cases=cached_cases,
     )
 
     await audit(
