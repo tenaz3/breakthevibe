@@ -52,3 +52,30 @@ class CrawlRunRepository:
             except (json.JSONDecodeError, TypeError):
                 logger.warning("invalid_sitemap_json", project_id=project_id)
                 return {}
+
+    async def get_latest_for_project(
+        self,
+        project_id: int,
+        org_id: str = SENTINEL_ORG_ID,
+    ) -> dict[str, Any] | None:
+        """Return latest crawl run metadata including sitemap_hash, or None."""
+        async with AsyncSession(self._engine) as session:
+            stmt = (
+                select(CrawlRun)
+                .where(
+                    col(CrawlRun.project_id) == project_id,
+                    col(CrawlRun.org_id) == org_id,
+                )
+                .order_by(CrawlRun.created_at.desc())  # type: ignore[attr-defined]
+                .limit(1)
+            )
+            result = await session.execute(stmt)
+            crawl_run = result.scalars().first()
+            if not crawl_run:
+                return None
+            return {
+                "id": crawl_run.id,
+                "sitemap_hash": crawl_run.sitemap_hash,
+                "status": crawl_run.status,
+                "created_at": crawl_run.created_at,
+            }

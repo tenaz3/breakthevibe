@@ -90,6 +90,7 @@ class CrawlRun(SQLModel, table=True):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     site_map_json: str | None = None
+    sitemap_hash: str | None = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=_utc_now)
 
 
@@ -112,17 +113,21 @@ class Route(SQLModel, table=True):
 
 class TestCase(SQLModel, table=True):
     __tablename__ = "test_cases"
+    __table_args__ = (Index("ix_test_cases_project_hash", "project_id", "sitemap_hash"),)
 
     id: int | None = Field(default=None, primary_key=True)
     org_id: str = Field(default=SENTINEL_ORG_ID, index=True)
     project_id: int = Field(foreign_key="projects.id", index=True)
+    crawl_run_id: int | None = Field(default=None, foreign_key="crawl_runs.id", index=True)
     name: str
     category: str  # functional | visual | api
+    description: str = Field(default="")
     route_path: str
     steps_json: str | None = None
     code: str | None = None
-    selectors_json: str | None = None
+    sitemap_hash: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
 
 
 class TestRun(SQLModel, table=True):

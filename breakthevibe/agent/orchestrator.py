@@ -97,6 +97,7 @@ class PipelineOrchestrator:
         openapi_spec: dict[str, Any] | None = None,
         org_id: str = SENTINEL_ORG_ID,
         active_stages: list[PipelineStage] | None = None,
+        pre_context: dict[str, Any] | None = None,
     ) -> PipelineResult:
         """Execute the pipeline, optionally restricted to a subset of stages.
 
@@ -108,6 +109,7 @@ class PipelineOrchestrator:
             org_id: The organisation identifier for multi-tenant scoping.
             active_stages: Ordered list of stages to execute. Defaults to all
                 five stages when ``None``.
+            pre_context: Optional pre-populated context (e.g. cached test cases).
         """
         run_id = str(uuid.uuid4())
         start = time.monotonic()
@@ -146,6 +148,8 @@ class PipelineOrchestrator:
             "openapi_spec": openapi_spec,
             "org_id": org_id,
         }
+        if pre_context:
+            context.update(pre_context)
 
         try:
             for stage, handler in stages:
@@ -259,14 +263,20 @@ class PipelineOrchestrator:
                 except (ValueError, TypeError):
                     logger.warning("invalid_project_id", project_id=context["project_id"])
                     return
+                from breakthevibe.utils.sitemap_hash import compute_sitemap_hash
+
+                s_hash = compute_sitemap_hash(result)
                 crawl_run = CrawlRun(
                     project_id=pid,
                     org_id=context.get("org_id", SENTINEL_ORG_ID),
                     status="completed",
                     site_map_json=result.model_dump_json(),
+                    sitemap_hash=s_hash,
                 )
                 session.add(crawl_run)
                 await session.commit()
+                context["crawl_run_id"] = crawl_run.id
+                context["sitemap_hash"] = s_hash
         except Exception as e:
             # Broad catch: DB persist is best-effort; SQLAlchemy, asyncpg, and
             # serialization errors must not abort the pipeline.
@@ -295,6 +305,23 @@ class PipelineOrchestrator:
             for case in cases:
                 case.code = self._code_builder.generate(case)
         context["test_cases"] = cases
+
+        # Cache generated test cases to DB (best-effort)
+        if cases:
+            try:
+                from breakthevibe.storage.database import get_engine
+                from breakthevibe.storage.repositories.test_cases import TestCaseRepository
+
+                repo = TestCaseRepository(get_engine())
+                await repo.save_batch(
+                    project_id=int(context["project_id"]),
+                    org_id=context.get("org_id", SENTINEL_ORG_ID),
+                    crawl_run_id=context.get("crawl_run_id"),
+                    sitemap_hash=context.get("sitemap_hash", ""),
+                    cases=cases,
+                )
+            except Exception as e:
+                logger.warning("test_case_cache_failed", error=str(e))
 
     async def _run_tests(self, context: dict[str, Any]) -> None:
         cases = context.get("test_cases", [])

@@ -13,6 +13,7 @@ from breakthevibe.storage.database import get_engine
 from breakthevibe.storage.repositories.crawl_runs import CrawlRunRepository
 from breakthevibe.storage.repositories.db_projects import DatabaseProjectRepository
 from breakthevibe.storage.repositories.llm_settings import LlmSettingsRepository
+from breakthevibe.storage.repositories.test_cases import TestCaseRepository
 from breakthevibe.storage.repositories.test_runs import TestRunRepository
 from breakthevibe.storage.repositories.users import DatabaseUserRepository
 from breakthevibe.storage.repositories.webauthn import DatabaseWebAuthnCredentialRepository
@@ -43,6 +44,7 @@ llm_settings_repo = LlmSettingsRepository(get_engine())
 user_repo = DatabaseUserRepository(get_engine())
 webauthn_credential_repo = DatabaseWebAuthnCredentialRepository(get_engine())
 test_run_repo = TestRunRepository(get_engine())
+test_case_repo = TestCaseRepository(get_engine())
 crawl_run_repo = CrawlRunRepository(get_engine())
 passkey_service = _create_passkey_service()
 
@@ -70,6 +72,7 @@ async def run_pipeline(
     org_id: str = SENTINEL_ORG_ID,
     stages: list[PipelineStage] | None = None,
     request_id: str | None = None,
+    force_regenerate: bool = False,
 ) -> None:
     """Run a (possibly partial) pipeline as a background task.
 
@@ -81,6 +84,7 @@ async def run_pipeline(
         stages: Ordered list of ``PipelineStage`` values to execute.
             Defaults to all five stages when ``None``.
         request_id: Optional request correlation ID for structured logging.
+        force_regenerate: When True, skip cache check and force LLM regeneration.
     """
     import structlog.contextvars
 
@@ -128,6 +132,30 @@ async def run_pipeline(
                 )
 
             try:
+                # Cache check: skip CRAWL/MAP/GENERATE if cached tests are valid
+                pre_context: dict[str, Any] | None = None
+                if not force_regenerate and PipelineStage.RUN in active_stages:
+                    cache_meta = await test_case_repo.get_cache_meta(pid, org_id)
+                    if cache_meta:
+                        latest_crawl = await crawl_run_repo.get_latest_for_project(pid, org_id)
+                        if (
+                            latest_crawl
+                            and latest_crawl.get("sitemap_hash") == cache_meta["sitemap_hash"]
+                        ):
+                            cached_cases = await test_case_repo.load_for_project(pid, org_id)
+                            if cached_cases:
+                                logger.info(
+                                    "cache_hit",
+                                    project_id=project_id,
+                                    count=len(cached_cases),
+                                    sitemap_hash=cache_meta["sitemap_hash"],
+                                )
+                                active_stages = [
+                                    PipelineStage.RUN,
+                                    PipelineStage.REPORT,
+                                ]
+                                pre_context = {"test_cases": cached_cases}
+
                 orchestrator = await build_pipeline(
                     project_id=project_id,
                     url=url,
@@ -141,6 +169,7 @@ async def run_pipeline(
                     rules_yaml=rules_yaml,
                     org_id=org_id,
                     active_stages=active_stages,
+                    pre_context=pre_context,
                 )
 
                 logger.info(
