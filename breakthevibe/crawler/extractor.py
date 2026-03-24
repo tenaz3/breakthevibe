@@ -74,7 +74,7 @@ class ComponentExtractor:
             # aria_snapshot returns a YAML-like string; wrap it as a simple dict
             self._a11y_snapshot = {"role": "document", "name": "", "raw": snapshot_text}
         except Exception:  # noqa: BLE001
-            pass
+            pass  # nosec B110 — a11y snapshot is best-effort enrichment
 
         raw_elements: list[dict[str, Any]] = await page.evaluate(EXTRACT_JS)
 

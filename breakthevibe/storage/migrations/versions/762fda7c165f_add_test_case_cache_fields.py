@@ -1,7 +1,7 @@
 """add_test_case_cache_fields
 
 Revision ID: 762fda7c165f
-Revises: 48777a7a65b9
+Revises: fa6cd78ab556
 Create Date: 2026-03-23 23:51:02.670798
 
 """
@@ -14,7 +14,7 @@ import sqlmodel.sql.sqltypes
 
 # revision identifiers, used by Alembic.
 revision: str = '762fda7c165f'
-down_revision: Union[str, Sequence[str], None] = '48777a7a65b9'
+down_revision: Union[str, Sequence[str], None] = 'fa6cd78ab556'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
