@@ -25,7 +25,7 @@ COPY --from=builder /app/.venv /app/.venv
 
 # Copy application code
 COPY breakthevibe/ breakthevibe/
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock ./
 COPY alembic.ini* ./
 COPY scripts/ scripts/
 
