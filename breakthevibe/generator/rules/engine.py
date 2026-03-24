@@ -73,6 +73,10 @@ class RulesEngine:
         """Get action for modals."""
         return self._config.interactions.modals
 
+    def get_blockers(self) -> list[dict[str, Any]]:
+        """Get custom blocker rules for site-specific dismiss actions."""
+        return [b.model_dump() for b in self._config.interactions.blockers]
+
     def get_scroll_behavior(self) -> str:
         """Get scroll behavior setting."""
         return self._config.crawl.scroll_behavior

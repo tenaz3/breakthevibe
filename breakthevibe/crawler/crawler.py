@@ -290,73 +290,124 @@ class Crawler:
         return page_data
 
     async def _handle_interactions(self, page: Page) -> None:
-        """Handle consent pages, cookie banners, modals, etc. based on rules."""
+        """Handle consent pages, cookie banners, modals, etc. based on rules.
+
+        Uses a unified blocker system: built-in defaults for common patterns
+        (consent pages, cookie banners, modals) plus user-defined custom
+        blockers for site-specific elements.
+        """
         if not self._rules:
             return
 
-        # Handle consent/GDPR gate pages (full-page redirects to /consent, /cookie-policy, etc.)
-        consent_action = self._rules.get_consent_page_action() if self._rules else "accept"
         current_url = page.url
-        if consent_action == "accept" and (
-            "/consent" in current_url or "/cookie-policy" in current_url
-        ):
-            for selector in [
-                "button:has-text('Accept')",
-                "button:has-text('Agree')",
-                "button:has-text('Continue')",
-                "button:has-text('I agree')",
-                "button:has-text('Allow')",
-                "[data-testid='consent-accept']",
-                "form[action*='consent'] button[type='submit']",
-            ]:
+
+        # Built-in blocker definitions (domain-agnostic defaults)
+        builtin_blockers = []
+
+        # 1. Consent/GDPR gate pages
+        if self._rules.get_consent_page_action() == "accept":
+            builtin_blockers.append(
+                {
+                    "url_patterns": [
+                        "*/consent*",
+                        "*/cookie-policy*",
+                        "*/gdpr*",
+                        "*/privacy-gate*",
+                    ],
+                    "selectors": [
+                        "button:has-text('Accept')",
+                        "button:has-text('Agree')",
+                        "button:has-text('Continue')",
+                        "button:has-text('I agree')",
+                        "button:has-text('Allow')",
+                        "[data-testid*='consent'] button",
+                        "[data-testid*='accept'] button",
+                        "form[action*='consent'] button[type='submit']",
+                    ],
+                    "wait_after": 2000,
+                }
+            )
+
+        # 2. Cookie banners (in-page overlays)
+        if self._rules.get_cookie_banner_action() == "dismiss":
+            builtin_blockers.append(
+                {
+                    "url_patterns": [],  # any page
+                    "selectors": [
+                        "[class*='cookie'] button:has-text('Accept')",
+                        "[id*='cookie'] button:has-text('Accept')",
+                        "button:has-text('Accept cookies')",
+                        "button:has-text('Accept all')",
+                        "[class*='cookie'] button",
+                        "[id*='cookie'] button",
+                        "button:has-text('OK')",
+                        "button:has-text('Got it')",
+                    ],
+                    "wait_after": 1000,
+                }
+            )
+
+        # 3. Modals
+        if self._rules.get_modal_action() == "close_on_appear":
+            builtin_blockers.append(
+                {
+                    "url_patterns": [],  # any page
+                    "selectors": [
+                        "[role='dialog'] button[aria-label='Close']",
+                        "[role='dialog'] button[aria-label='Dismiss']",
+                        ".modal-close",
+                        "[class*='modal'] button:has-text('Close')",
+                        "[class*='overlay'] button:has-text('Close')",
+                        "[class*='popup'] button:has-text('Close')",
+                    ],
+                    "wait_after": 500,
+                }
+            )
+
+        # Merge user-defined custom blockers
+        custom_blockers = self._rules.get_blockers() if self._rules else []
+        all_blockers = builtin_blockers + custom_blockers
+
+        # Run each blocker
+        for blocker in all_blockers:
+            if blocker.get("action") == "ignore":
+                continue
+
+            # Check URL pattern match (empty patterns = match any page)
+            url_patterns = blocker.get("url_patterns", [])
+            if url_patterns:
+                import fnmatch
+
+                matched = any(fnmatch.fnmatch(current_url, p) for p in url_patterns)
+                if not matched:
+                    continue
+
+            # Try each selector
+            for selector in blocker.get("selectors", []):
                 try:
                     locator = page.locator(selector).first
-                    if await locator.is_visible(timeout=2000):
+                    timeout = 2000 if url_patterns else 500
+                    if await locator.is_visible(timeout=timeout):
                         await locator.click()
-                        await page.wait_for_load_state("networkidle", timeout=5000)
+                        wait_ms = blocker.get("wait_after", self._after_click_wait)
+                        if url_patterns:
+                            # Page-level blocker — wait for navigation
+                            try:
+                                await page.wait_for_load_state(
+                                    "networkidle", timeout=wait_ms + 3000
+                                )
+                            except PlaywrightError:
+                                await page.wait_for_timeout(wait_ms)
+                        else:
+                            await page.wait_for_timeout(wait_ms)
                         logger.info(
-                            "consent_page_accepted",
+                            "blocker_dismissed",
                             url=current_url,
                             selector=selector,
+                            has_url_pattern=bool(url_patterns),
                         )
                         break
                 except PlaywrightError:
-                    continue
-
-        # Dismiss cookie banners
-        if self._rules.get_cookie_banner_action() == "dismiss":
-            for selector in [
-                "button:has-text('Accept')",
-                "button:has-text('OK')",
-                "button:has-text('Got it')",
-                "[class*='cookie'] button",
-                "[id*='cookie'] button",
-            ]:
-                try:
-                    locator = page.locator(selector).first
-                    if await locator.is_visible(timeout=1000):
-                        await locator.click()
-                        await page.wait_for_timeout(self._after_click_wait)
-                        logger.debug("cookie_banner_dismissed", selector=selector)
-                        break
-                except PlaywrightError:  # nosec B112
-                    continue
-
-        # Close modals
-        if self._rules.get_modal_action() == "close_on_appear":
-            for selector in [
-                "[role='dialog'] button[aria-label='Close']",
-                ".modal-close",
-                "[class*='modal'] button:has-text('Close')",
-            ]:
-                try:
-                    locator = page.locator(selector).first
-                    if await locator.is_visible(timeout=500):
-                        await locator.click()
-                        await page.wait_for_timeout(self._after_click_wait)
-                        logger.debug("modal_closed", selector=selector)
-                        break
-                except PlaywrightError:  # nosec B112
                     continue
 
     async def _click_interactive_elements(

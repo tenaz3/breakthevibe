@@ -37,11 +37,22 @@ class InputRules(BaseModel):
         return cls(values=data)
 
 
+class BlockerRule(BaseModel):
+    """A dismissible blocker: consent page, cookie banner, modal, paywall, etc."""
+
+    action: str = "dismiss"  # dismiss | skip | ignore
+    url_patterns: list[str] = Field(default_factory=list)  # URL patterns that trigger this
+    selectors: list[str] = Field(default_factory=list)  # CSS selectors to click to dismiss
+    wait_after: int = 1000  # ms to wait after clicking
+
+
 class InteractionRules(BaseModel):
     cookie_banner: str = "dismiss"
-    consent_page: str = "accept"  # accept | skip | ignore
+    consent_page: str = "accept"
     modals: str = "close_on_appear"
     infinite_scroll: str = "scroll_3_times"
+    # Custom blockers — domain/site-agnostic, user-defined
+    blockers: list[BlockerRule] = Field(default_factory=list)
 
 
 class TestRules(BaseModel):
